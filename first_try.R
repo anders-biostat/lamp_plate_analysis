@@ -45,26 +45,45 @@ readxl::excel_sheets( tecan_workbook ) %>%
 
 library( rlc )
 
-openPage( FALSE, layout = "table3x3" )
+getOpacity <- function(highlighted) {
+  if(highlighted == -1) {
+    op <- rep(1, nrow(contents))
+  } else {
+    op <- rep(0.2, nrow(contents))
+    op[highlighted] <- 1
+  }
+  op
+}
+app <- openPage( FALSE, startPage = "plateBrowser.html" )
 
 for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
   data <- filter(tblWide, corner == cnr)
+  highlighted <- -1
   
-  lc_line( 
+  lc_line(
+    dat(opacity = getOpacity(highlighted)),
     x = as.numeric(data$minutes),
     y = (select(data, -(sheet:corner)) %>% as.matrix())[, contents$well96],
     colourValue = contents$content,
-    label = sprintf( "Well: %s [96] / %s [384]", 
-      contents$well96, contents[[cnr]] ),
     title = sprintf( "corner %s: plate %s, primer set %s",
       cnr, corners[cnr, "plate"], corners[cnr, "PrimerSet"] ),
+    transitionDuration = 0,
+    showLegend = FALSE,
     on_mouseover = function(d) {
+      highlighted <<- d
+      updateCharts(updateOnly = "ElementStyle")
       for(c in c( "A1", "A2", "B1", "B2" ))
         mark(d, c)
     },
     on_mouseout = function(d) {
+      highlighted <<- -1
+      updateCharts(updateOnly = "ElementStyle")
       for(c in c( "A1", "A2", "B1", "B2" ))
         mark(NULL, chartId = c)
+      
     },
     place = cnr )
 }
+ses <- app$getSession()
+ses$sendCommand(str_c("charts.A1.legend.container(d3.select('#info').select('#legend'));",
+                      "charts.A1.showLegend(true).update();"))
