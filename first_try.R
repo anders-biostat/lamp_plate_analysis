@@ -58,5 +58,13 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
       contents$well96, contents[[cnr]] ),
     title = sprintf( "corner %s: plate %s, primer set %s",
       cnr, corners[cnr, "plate"], corners[cnr, "PrimerSet"] ),
+    on_mouseover = function(d) {
+      for(c in c( "A1", "A2", "B1", "B2" ))
+        mark(d, c)
+    },
+    on_mouseout = function(d) {
+      for(c in c( "A1", "A2", "B1", "B2" ))
+        mark(NULL, chartId = c)
+    },
     place = cnr )
 }
