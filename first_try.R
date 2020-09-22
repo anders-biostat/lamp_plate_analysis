@@ -19,7 +19,10 @@ readxl::read_excel( tecan_workbook, "PrimerSetsUsed" ) %>%
   as.data.frame() -> corners
   
 readxl::read_excel( tecan_workbook, "Barcodes_SampleTypes" )  %>%
-  rename( "well96" = "Tube Position", "plate" = "Rack ID", "content" = "Type" ) %>%
+  rename( "well96" = "Tube Position", 
+          "plate" = "Rack ID", 
+          "content" = "Type",
+          "tubeId" = "Tube ID") %>%
   mutate_at( "well96", str_replace, "0(\\d+)", "\\1" ) -> contents
 
 readxl::excel_sheets( tecan_workbook ) %>%
@@ -54,6 +57,14 @@ getOpacity <- function(highlighted) {
   }
   op
 }
+getContent <- function(highlighted) {
+  if(highlighted == -1) return("No highlighted lines")
+  str_c(str_replace_na(c("Highlighted: ", contents$tubeId[highlighted], "<br>",
+        "96 well position: ", contents$well96[highlighted], "<br>",
+        "384 well position: ", contents[1, c("A1", "A2", "B1", "B2")] %>% 
+          unlist %>% 
+          str_c(collapse = ", "))), collapse = "")
+}
 app <- openPage( FALSE, startPage = "plateBrowser.html" )
 
 for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
@@ -72,18 +83,23 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
     on_mouseover = function(d) {
       highlighted <<- d
       updateCharts(updateOnly = "ElementStyle")
+      updateCharts("highlighted")
       for(c in c( "A1", "A2", "B1", "B2" ))
         mark(d, c)
     },
     on_mouseout = function(d) {
       highlighted <<- -1
       updateCharts(updateOnly = "ElementStyle")
+      updateCharts("highlighted")
       for(c in c( "A1", "A2", "B1", "B2" ))
         mark(NULL, chartId = c)
       
     },
-    place = cnr )
+    place = cnr, pacerStep = 500)
 }
+
+lc_html(dat(content = getContent(highlighted)), place = "highlighted")
 ses <- app$getSession()
 ses$sendCommand(str_c("charts.A1.legend.container(d3.select('#info').select('#legend'));",
                       "charts.A1.showLegend(true).update();"))
+
