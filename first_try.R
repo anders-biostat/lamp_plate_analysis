@@ -39,8 +39,9 @@ readxl::excel_sheets( tecan_workbook ) %>%
   mutate( well96 = str_c( LETTERS[row96], col96 ) ) %>%
   mutate( corner = str_c( LETTERS[ 1 + (row+1) %% 2 ], 1 + (col+1) %% 2 ) ) %>%
   mutate(dOd = od434 - od560) %T>%
-  {contents <<- select(., well, well96, corner) %>%
+  {contents <<- select(., well, well96, corner, row96, col96) %>%
     distinct() %>%
+    mutate(row96Letter = LETTERS[row96]) %>%
     pivot_wider(names_from = corner, values_from = well) %>%
     left_join(contents)} %>%
   select(-od434, -od560, -row, -col, -row96, -col96, -well) %>%
@@ -80,23 +81,40 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
       cnr, corners[cnr, "plate"], corners[cnr, "PrimerSet"] ),
     transitionDuration = 0,
     showLegend = FALSE,
-    on_mouseover = function(d) {
-      highlighted <<- d
-      updateCharts(updateOnly = "ElementStyle")
-      updateCharts("highlighted")
-      for(c in c( "A1", "A2", "B1", "B2" ))
-        mark(d, c)
-    },
+    on_mouseover = (function(cnr) {
+      return(function(d) {
+        highlighted <<- d
+        updateCharts("highlighted")
+        for(c in c( "A1", "A2", "B1", "B2" ))
+          if(corners[cnr, "plate"] == corners[c, "plate"]){
+            updateCharts(c, updateOnly = "ElementStyle")
+            mark(d, c)
+          }
+        mark(c(contents$row96[d], contents$col96[d]), chartId = corners[cnr, "plate"])
+      })
+    })(cnr),
     on_mouseout = function(d) {
       highlighted <<- -1
       updateCharts(updateOnly = "ElementStyle")
       updateCharts("highlighted")
       for(c in c( "A1", "A2", "B1", "B2" ))
         mark(NULL, chartId = c)
-      
+      for(pl in unique(corners$plate))
+        mark(NULL, chartId = pl)
     },
-    place = cnr, pacerStep = 500)
+    place = cnr, pacerStep = 100)
 }
+
+for(pl in unique(corners$plate)){
+  contents %>% 
+    filter(plate == pl) %>%
+    select(row96Letter, col96, content) %>%
+    pivot_wider(names_from = col96, values_from = content) %>%
+    column_to_rownames("row96Letter") %>%
+    as.matrix() -> data
+  lc_heatmap(value = data, place = "plates", chartId = pl)
+}
+  
 
 lc_html(dat(content = getContent(highlighted)), place = "highlighted")
 ses <- app$getSession()
