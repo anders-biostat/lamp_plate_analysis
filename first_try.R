@@ -1,3 +1,4 @@
+library( later )
 library( tidyverse )
 library( here )
 
@@ -66,6 +67,17 @@ getContent <- function(highlighted) {
           unlist %>% 
           str_c(collapse = ", "))), collapse = "")
 }
+clearHighlighted <- function() {
+  updateCharts(updateOnly = "ElementStyle")
+  updateCharts("highlighted")
+  for(c in c( "A1", "A2", "B1", "B2" ))
+    mark(NULL, chartId = c)
+  for(pl in unique(corners$plate))
+    mark(NULL, chartId = pl)  
+}
+last <- function() {}
+loop <- create_loop()
+
 app <- openPage( FALSE, startPage = "plateBrowser.html" )
 
 for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
@@ -84,6 +96,7 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
     on_mouseover = (function(cnr) {
       return(function(d) {
         highlighted <<- d
+        last()
         updateCharts("highlighted")
         for(c in c( "A1", "A2", "B1", "B2" ))
           if(corners[cnr, "plate"] == corners[c, "plate"]){
@@ -95,14 +108,9 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
     })(cnr),
     on_mouseout = function(d) {
       highlighted <<- -1
-      updateCharts(updateOnly = "ElementStyle")
-      updateCharts("highlighted")
-      for(c in c( "A1", "A2", "B1", "B2" ))
-        mark(NULL, chartId = c)
-      for(pl in unique(corners$plate))
-        mark(NULL, chartId = pl)
+      last <<- later(clearHighlighted, 0.5, loop)
     },
-    place = cnr, pacerStep = 100)
+    place = cnr)
 }
 
 for(pl in unique(corners$plate)){
