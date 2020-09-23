@@ -68,7 +68,7 @@ getContent <- function(highlighted) {
           str_c(collapse = ", "))), collapse = "")
 }
 clearHighlighted <- function() {
-  updateCharts(updateOnly = "ElementStyle")
+  updateCharts(chartId = c("A1", "A2", "B1", "B2"), updateOnly = "ElementStyle")
   updateCharts("highlighted")
   for(c in c( "A1", "A2", "B1", "B2" ))
     mark(NULL, chartId = c)
@@ -93,6 +93,9 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
       cnr, corners[cnr, "plate"], corners[cnr, "PrimerSet"] ),
     transitionDuration = 0,
     showLegend = FALSE,
+    palette = c("#17a417", "#247ed7", "#737679", "#b45422"),
+    colourDomain = c("positive control", "sample", "water", "empty"),
+    height = 300,
     on_mouseover = (function(cnr) {
       return(function(d) {
         highlighted <<- d
@@ -101,14 +104,15 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
         for(c in c( "A1", "A2", "B1", "B2" ))
           if(corners[cnr, "plate"] == corners[c, "plate"]){
             updateCharts(c, updateOnly = "ElementStyle")
-            mark(d, c)
+            mark(d, c, clear = TRUE)
           }
-        mark(c(contents$row96[d], contents$col96[d]), chartId = corners[cnr, "plate"])
+        mark(c(contents$row96[d], contents$col96[d]), chartId = corners[cnr, "plate"],
+             clear = TRUE)
       })
     })(cnr),
     on_mouseout = function(d) {
       highlighted <<- -1
-      last <<- later(clearHighlighted, 0.5, loop)
+      last <<- later(clearHighlighted, 0.75, loop)
     },
     place = cnr)
 }
@@ -120,7 +124,12 @@ for(pl in unique(corners$plate)){
     pivot_wider(names_from = col96, values_from = content) %>%
     column_to_rownames("row96Letter") %>%
     as.matrix() -> data
-  lc_heatmap(value = data, place = "plates", chartId = pl)
+  lc_heatmap(value = data, 
+             showLegend = TRUE, 
+             height = 300,
+             palette = c("#17a417", "#247ed7", "#737679", "#b45422"),
+             colourDomain = c("positive control", "sample", "water", "empty"),
+             place = "plates", chartId = pl)
 }
   
 
