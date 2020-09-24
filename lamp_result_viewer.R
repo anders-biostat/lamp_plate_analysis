@@ -1,7 +1,9 @@
 library( later )
 library( tidyverse )
 
-tecan_workbook <- "data/EMBL_Plates.xlsx"
+tecan_workbook <- commandArgs(TRUE)[1]
+if(!file.exists(tecan_workbook))
+  stop(str_c("File not found: ", tecan_workbook))
 
 read_tecan_sheet <- function( filename, sheet ) {
   inner_join( by="well",
@@ -164,4 +166,9 @@ ses <- app$getSession()
 ses$sendCommand(str_c("charts.A1.legend.container(d3.select('#info').select('#legend')).legend.sampleHeight(30);",
                       "charts.A1.showLegend(true).update();"))
 ses$sendCommand('d3.selectAll("#legend").selectAll("text").attr("font-size", 17).attr("dy", 7)')
+ses$sendCommand(str_interp('d3.select("h3").text(File: ${basename(tecan_workbook)})'))
 
+while(length(app$getSessionIds()) > 0)
+  httpuv::service()
+
+Sys.sleep(3)
