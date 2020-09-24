@@ -69,10 +69,10 @@ getContent <- function(highlighted) {
 }
 clearHighlighted <- function() {
   if(highlighted == -1){
-    updateCharts(chartId = c("A1", "A2", "B1", "B2"), updateOnly = "ElementStyle")
+    updateCharts(chartId = c("A1", "A2", "B1", "B2", 
+                             unique(corners$plate)), 
+                 updateOnly = "ElementStyle")
     updateCharts("highlighted")
-    for(pl in unique(corners$plate))
-      mark(NULL, chartId = pl)  
   }
 }
 last <- function() {}
@@ -107,8 +107,7 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
           if(corners[cnr, "plate"] == corners[c, "plate"]){
             updateCharts(c, updateOnly = "ElementStyle")
           }
-        mark(c(contents$row96[d], contents$col96[d]), chartId = corners[cnr, "plate"],
-             clear = TRUE)
+        updateCharts(corners[cnr, "plate"], updateOnly = "ElementStyle")
       })
     })(cnr),
     on_mouseout = function(d) {
@@ -121,16 +120,36 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
 for(pl in unique(corners$plate)){
   contents %>% 
     filter(plate == pl) %>%
-    select(row96Letter, col96, content) %>%
-    pivot_wider(names_from = col96, values_from = content) %>%
-    column_to_rownames("row96Letter") %>%
-    as.matrix() -> data
-  lc_heatmap(value = data, 
-             showLegend = TRUE, 
-             height = 300,
-             palette = c("#17a417", "#247ed7", "#737679", "#b45422"),
-             colourDomain = c("positive control", "sample", "water", "empty"),
-             place = "plates", chartId = pl)
+    select(row96Letter, col96, content, tubeId) %>%
+    mutate(row96Letter = factor(row96Letter, levels = LETTERS[8:1])) -> data
+  lc_scatter(dat(opacity = getOpacity(highlighted), 
+                 x = col96, y = row96Letter,
+                 colourValue = content,
+                 label = tubeId),
+    palette = c("#17a417", "#247ed7", "#737679", "#b45422"),
+    colourDomain = c("positive control", "sample", "water", "empty"),
+    height = 300,
+    strokeWidth = 2,
+    stroke = "black",
+    on_mouseover = (function(pl) {
+      return(function(d) {
+        highlighted <<- d
+        updateCharts("highlighted")
+        for(c in c( "A1", "A2", "B1", "B2" ))
+          if(pl == corners[c, "plate"]){
+            updateCharts(c, updateOnly = "ElementStyle")
+          }
+        updateCharts(pl, updateOnly = "ElementStyle")
+      })
+    })(pl),
+    on_mouseout = function() {
+      highlighted <<- -1
+      clearHighlighted()
+    },
+    showLegend = FALSE,
+    transitionDuration = 0,
+    size = 9,
+    place = "plates", chartId = pl, with = data)
 }
   
 
