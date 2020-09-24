@@ -1,8 +1,7 @@
 library( later )
 library( tidyverse )
-library( here )
 
-tecan_workbook <- here( "ZST00015.xlsx" )
+tecan_workbook <- "data/EMBL_Plates.xlsx"
 
 read_tecan_sheet <- function( filename, sheet ) {
   inner_join( by="well",
@@ -16,6 +15,8 @@ read_tecan_sheet <- function( filename, sheet ) {
 
 readxl::read_excel( tecan_workbook, "PrimerSetsUsed" ) %>%
   rename( "plate"="Plate-ID", "corner" = "A1 position of 96-well in 384-well" ) %>%
+  mutate_at( "plate", str_replace_all, " ", "_" ) %>%
+  mutate_at( "plate", str_replace_all, "-", "." ) %>%
   column_to_rownames("corner") %>%
   as.data.frame() -> corners
   
@@ -24,7 +25,12 @@ readxl::read_excel( tecan_workbook, "Barcodes_SampleTypes" )  %>%
           "plate" = "Rack ID", 
           "content" = "Type",
           "tubeId" = "Tube ID") %>%
+  mutate_at( "plate", str_replace_all, " ", "_" ) %>%
+  mutate_at( "plate", str_replace_all, "-", "." ) %>%
   mutate_at( "well96", str_replace, "0(\\d+)", "\\1" ) -> contents
+
+if(length(setdiff(corners$plate, contents$plate)) > 0)
+  stop(str_interp("Content information is missing for the following plates: ${setdiff(corners$plate, contents$plate)}"))
 
 readxl::excel_sheets( tecan_workbook ) %>%
   { tibble( sheet = . ) } %>%
@@ -44,7 +50,8 @@ readxl::excel_sheets( tecan_workbook ) %>%
     distinct() %>%
     mutate(row96Letter = LETTERS[row96]) %>%
     pivot_wider(names_from = corner, values_from = well) %>%
-    left_join(contents)} %>%
+    left_join(contents) %>%
+    pivot_wider(names_from = plate, values_from = c("tubeId", "content"))} %>%
   select(-od434, -od560, -row, -col, -row96, -col96, -well) %>%
   pivot_wider(names_from = well96, values_from = dOd) -> tblWide
 
@@ -59,13 +66,14 @@ getOpacity <- function(highlighted) {
   }
   op
 }
-getContent <- function(highlighted) {
+getContent <- function(highlighted, plate) {
   if(highlighted == -1) return("No highlighted lines")
-  str_c(str_replace_na(c("Highlighted: ", contents$tubeId[highlighted], "<br>",
+  str_c(str_replace_na(c("Highlighted: ", contents[[str_c("tubeId_", plate)]][highlighted], "<br>",
         "96 well position: ", contents$well96[highlighted], "<br>",
         "384 well position: ", contents[highlighted, c("A1", "A2", "B1", "B2")] %>% 
           unlist %>% 
-          str_c(collapse = ", "))), collapse = "")
+          str_c(collapse = ", "))), 
+        collapse = "")
 }
 clearHighlighted <- function() {
   if(highlighted == -1){
@@ -83,14 +91,15 @@ app <- openPage( FALSE, startPage = "plateBrowser.html" )
 for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
   data <- filter(tblWide, corner == cnr)
   highlighted <- -1
+  plate <- corners$plate[1]
   
   lc_line(
     dat(opacity = getOpacity(highlighted),
         lineWidth = ifelse(1:nrow(contents) == highlighted, 3, 1)),
     x = as.numeric(data$minutes),
     y = (select(data, -(sheet:corner)) %>% as.matrix())[, contents$well96],
+    colourValue = contents[[str_c("content_", corners[cnr, "plate"])]],
     mode = "canvas",
-    colourValue = contents$content,
     title = sprintf( "corner %s: plate %s, primer set %s",
       cnr, corners[cnr, "plate"], corners[cnr, "PrimerSet"] ),
     transitionDuration = 0,
@@ -99,18 +108,17 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
     colourDomain = c("positive control", "sample", "water", "empty"),
     height = 300,
     titleSize = 18,
-    on_mouseover = (function(cnr) {
-      return(function(d) {
+    on_mouseover = function(d) {
         highlighted <<- d
+        plate <<- corners[.chartId, "plate"]
         last()
         updateCharts("highlighted")
         for(c in c( "A1", "A2", "B1", "B2" ))
-          if(corners[cnr, "plate"] == corners[c, "plate"]){
+          if(corners[.chartId, "plate"] == corners[c, "plate"]){
             updateCharts(c, updateOnly = "ElementStyle")
           }
-        updateCharts(corners[cnr, "plate"], updateOnly = "ElementStyle")
-      })
-    })(cnr),
+        updateCharts(corners[.chartId, "plate"], updateOnly = "ElementStyle")
+      },
     on_mouseout = function(d) {
       highlighted <<- -1
       last <<- later(clearHighlighted, 0.4, loop)
@@ -119,14 +127,9 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
 }
 
 for(pl in unique(corners$plate)){
-  contents %>% 
-    filter(plate == pl) %>%
-    select(row96Letter, col96, content, tubeId) %>%
-    mutate(row96Letter = factor(row96Letter, levels = LETTERS[8:1])) -> data
   lc_scatter(dat(opacity = getOpacity(highlighted), 
-                 x = col96, y = row96Letter,
-                 colourValue = content,
-                 label = tubeId),
+                 x = col96, y = row96Letter),
+    colourValue = contents[[str_c("content_", pl)]],
     title = str_interp("Plate ${pl}"),
     titleSize = 20,
     palette = c("#1cb01c", "#c67c3b", "#4979e3", "#aeafb0"),
@@ -135,17 +138,16 @@ for(pl in unique(corners$plate)){
     width = 550,
     strokeWidth = 2,
     stroke = "black",
-    on_mouseover = (function(pl) {
-      return(function(d) {
+    on_mouseover = function(d) {
         highlighted <<- d
+        plate <<- .chartId
         updateCharts("highlighted")
         for(c in c( "A1", "A2", "B1", "B2" ))
-          if(pl == corners[c, "plate"]){
+          if(.chartId == corners[c, "plate"]){
             updateCharts(c, updateOnly = "ElementStyle")
           }
-        updateCharts(pl, updateOnly = "ElementStyle")
-      })
-    })(pl),
+        updateCharts(.chartId, updateOnly = "ElementStyle")
+      },
     on_mouseout = function() {
       highlighted <<- -1
       clearHighlighted()
@@ -153,11 +155,11 @@ for(pl in unique(corners$plate)){
     showLegend = FALSE,
     transitionDuration = 0,
     size = 10,
-    place = "plates", chartId = pl, with = data)
+    place = "plates", chartId = pl, with = contents)
 }
   
 
-lc_html(dat(content = getContent(highlighted)), place = "highlighted")
+lc_html(dat(content = getContent(highlighted, plate)), place = "highlighted")
 ses <- app$getSession()
 ses$sendCommand(str_c("charts.A1.legend.container(d3.select('#info').select('#legend')).legend.sampleHeight(30);",
                       "charts.A1.showLegend(true).update();"))
