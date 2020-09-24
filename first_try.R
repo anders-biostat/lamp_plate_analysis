@@ -63,17 +63,17 @@ getContent <- function(highlighted) {
   if(highlighted == -1) return("No highlighted lines")
   str_c(str_replace_na(c("Highlighted: ", contents$tubeId[highlighted], "<br>",
         "96 well position: ", contents$well96[highlighted], "<br>",
-        "384 well position: ", contents[1, c("A1", "A2", "B1", "B2")] %>% 
+        "384 well position: ", contents[highlighted, c("A1", "A2", "B1", "B2")] %>% 
           unlist %>% 
           str_c(collapse = ", "))), collapse = "")
 }
 clearHighlighted <- function() {
-  updateCharts(chartId = c("A1", "A2", "B1", "B2"), updateOnly = "ElementStyle")
-  updateCharts("highlighted")
-  for(c in c( "A1", "A2", "B1", "B2" ))
-    mark(NULL, chartId = c)
-  for(pl in unique(corners$plate))
-    mark(NULL, chartId = pl)  
+  if(highlighted == -1){
+    updateCharts(chartId = c("A1", "A2", "B1", "B2"), updateOnly = "ElementStyle")
+    updateCharts("highlighted")
+    for(pl in unique(corners$plate))
+      mark(NULL, chartId = pl)  
+  }
 }
 last <- function() {}
 loop <- create_loop()
@@ -85,9 +85,11 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
   highlighted <- -1
   
   lc_line(
-    dat(opacity = getOpacity(highlighted)),
+    dat(opacity = getOpacity(highlighted),
+        lineWidth = ifelse(1:nrow(contents) == highlighted, 3, 1)),
     x = as.numeric(data$minutes),
     y = (select(data, -(sheet:corner)) %>% as.matrix())[, contents$well96],
+    mode = "canvas",
     colourValue = contents$content,
     title = sprintf( "corner %s: plate %s, primer set %s",
       cnr, corners[cnr, "plate"], corners[cnr, "PrimerSet"] ),
@@ -104,7 +106,6 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
         for(c in c( "A1", "A2", "B1", "B2" ))
           if(corners[cnr, "plate"] == corners[c, "plate"]){
             updateCharts(c, updateOnly = "ElementStyle")
-            mark(d, c, clear = TRUE)
           }
         mark(c(contents$row96[d], contents$col96[d]), chartId = corners[cnr, "plate"],
              clear = TRUE)
