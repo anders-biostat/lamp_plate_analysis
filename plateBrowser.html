@@ -1,5 +1,19 @@
 <head>
 	<title>Plate Browser</title>
+	<style type="text/css">
+		body {
+			font-family: Helvetica, Arial, sans-serif;
+		}
+		#info #highlighted {
+			font-size: 14pt;
+			border: 1px solid black;
+			padding: 15px 20px 15px 20px;
+			width: 340px;
+		}
+		#highlighted .linked-charts {
+			line-height: 1.4;
+		}
+	</style>
 </head>
 <body>
 	<div style="display: grid;">
@@ -16,7 +30,7 @@
 			</table>			
 		</div>
 		<div id="plates" style="grid-column: 2; grid-row: 1/3;"></div>
-		<div id="info" style="grid-column: 1; grid-row: 2">
+		<div id="info" style="grid-column: 1; grid-row: 2; padding-left: 150px">
 			<table>
 				<tr>
 					<td id="legend"></td>

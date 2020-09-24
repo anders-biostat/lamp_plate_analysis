@@ -95,9 +95,10 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
       cnr, corners[cnr, "plate"], corners[cnr, "PrimerSet"] ),
     transitionDuration = 0,
     showLegend = FALSE,
-    palette = c("#17a417", "#247ed7", "#737679", "#b45422"),
+    palette = c("#1cb01c", "#c67c3b", "#4979e3", "#aeafb0"),
     colourDomain = c("positive control", "sample", "water", "empty"),
     height = 300,
+    titleSize = 18,
     on_mouseover = (function(cnr) {
       return(function(d) {
         highlighted <<- d
@@ -112,7 +113,7 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
     })(cnr),
     on_mouseout = function(d) {
       highlighted <<- -1
-      last <<- later(clearHighlighted, 0.75, loop)
+      last <<- later(clearHighlighted, 0.4, loop)
     },
     place = cnr)
 }
@@ -126,9 +127,12 @@ for(pl in unique(corners$plate)){
                  x = col96, y = row96Letter,
                  colourValue = content,
                  label = tubeId),
-    palette = c("#17a417", "#247ed7", "#737679", "#b45422"),
+    title = str_interp("Plate ${pl}"),
+    titleSize = 20,
+    palette = c("#1cb01c", "#c67c3b", "#4979e3", "#aeafb0"),
     colourDomain = c("positive control", "sample", "water", "empty"),
-    height = 300,
+    height = 350,
+    width = 550,
     strokeWidth = 2,
     stroke = "black",
     on_mouseover = (function(pl) {
@@ -148,13 +152,14 @@ for(pl in unique(corners$plate)){
     },
     showLegend = FALSE,
     transitionDuration = 0,
-    size = 9,
+    size = 10,
     place = "plates", chartId = pl, with = data)
 }
   
 
 lc_html(dat(content = getContent(highlighted)), place = "highlighted")
 ses <- app$getSession()
-ses$sendCommand(str_c("charts.A1.legend.container(d3.select('#info').select('#legend'));",
+ses$sendCommand(str_c("charts.A1.legend.container(d3.select('#info').select('#legend')).legend.sampleHeight(30);",
                       "charts.A1.showLegend(true).update();"))
+ses$sendCommand('d3.selectAll("#legend").selectAll("text").attr("font-size", 17).attr("dy", 7)')
 
