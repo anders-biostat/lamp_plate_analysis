@@ -1,1 +1,1 @@
-"C:\Program... \Rscript.exe" %1
+"C:\Program Files\R\R-4.0.2\bin\Rscript.exe" lamp_result_viewer.R %1

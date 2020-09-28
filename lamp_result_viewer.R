@@ -166,7 +166,8 @@ ses <- app$getSession()
 ses$sendCommand(str_c("charts.A1.legend.container(d3.select('#info').select('#legend')).legend.sampleHeight(30);",
                       "charts.A1.showLegend(true).update();"))
 ses$sendCommand('d3.selectAll("#legend").selectAll("text").attr("font-size", 17).attr("dy", 7)')
-ses$sendCommand(str_interp('d3.select("h3").text(File: ${basename(tecan_workbook)})'))
+fileName <- basename(tecan_workbook)
+ses$sendCommand(str_interp('d3.select("h3").html("File: <i>${fileName}</i>")'))
 
 while(length(app$getSessionIds()) > 0)
   httpuv::service()
