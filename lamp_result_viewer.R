@@ -131,6 +131,7 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
 for(pl in unique(corners$plate)){
   lc_scatter(dat(opacity = getOpacity(highlighted), 
                  x = col96, y = row96Letter),
+    domainY = LETTERS[8:1],
     colourValue = contents[[str_c("content_", pl)]],
     title = str_interp("Plate ${pl}"),
     titleSize = 20,
