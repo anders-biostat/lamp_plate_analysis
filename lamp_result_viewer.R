@@ -61,7 +61,7 @@ tblWide %>%
   filter(minutes  == 20) %>%
   pivot_longer(names_to = "well96", values_to = "diff", -(sheet:corner)) %>%
   left_join(corners %>% rownames_to_column("corner")) %>%
-  mutate(result = ifelse(diff > 0, "positive", "negative")) %>%
+  mutate(result = ifelse(diff > 0, "positive", "negative")) %>% 
   group_by(well96, plate) %>%
   summarise(result = case_when(result[PrimerSet == "ACTB"] == "negative" ~ "failed",
                                all(result[PrimerSet != "ACTB"] == "positive") ~ "positive",
@@ -92,13 +92,22 @@ getOpacity <- function(highlighted) {
   op
 }
 getContent <- function(highlighted, plate) {
-  if(highlighted == -1) return("No highlighted lines")
+  if(highlighted == -1) {
+    ses$sendCommand("d3.select('#highlighted').classed('failed', false);")
+    return("No highlighted lines")
+  }
+  if(contents[highlighted, str_c("result_", plate)] == "failed") {
+    ses$sendCommand("d3.select('#highlighted').classed('failed', true);")
+  } else {
+    ses$sendCommand("d3.select('#highlighted').classed('failed', false);")
+  }
   str_c(str_replace_na(c("Highlighted: ", contents[[str_c("tubeId_", plate)]][highlighted], "<br>",
-        "96 well position: ", contents$well96[highlighted], "<br>",
-        "384 well position: ", contents[highlighted, c("A1", "A2", "B1", "B2")] %>% 
-          unlist %>% 
-          str_c(collapse = ", "))), 
+                         "96 well position: ", contents$well96[highlighted], "<br>",
+                         "384 well position: ", contents[highlighted, c("A1", "A2", "B1", "B2")] %>% 
+                           unlist %>% 
+                           str_c(collapse = ", "))), 
         collapse = "")
+  
 }
 clearHighlighted <- function() {
   if(highlighted == -1){
@@ -106,12 +115,14 @@ clearHighlighted <- function() {
                              unique(corners$plate), str_c("res_", unique(corners$plate))), 
                  updateOnly = "ElementStyle")
     updateCharts("highlighted")
+    ses$sendCommand("d3.select('#highlighted').classed('failed', false);")
   }
 }
 last <- function() {}
 loop <- create_loop()
 
 app <- openPage( FALSE, startPage = "plateBrowser.html" )
+ses <- app$getSession()
 
 for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
   data <- filter(tblWide, corner == cnr)
@@ -195,7 +206,7 @@ for(pl in unique(corners$plate)){
   lc_scatter(dat(opacity = getOpacity(highlighted), 
                  x = col96, y = row96Letter),
              domainY = LETTERS[8:1],
-             colourValue = testResults[[pl]],
+             colourValue = contents[[str_c("result_", pl)]],
              title = str_interp("Plate ${pl}"),
              titleSize = 20,
              palette = palette$result$colour,
@@ -237,7 +248,7 @@ for(pl in unique(corners$plate)){
   
 
 lc_html(dat(content = getContent(highlighted, plate)), place = "highlighted")
-ses <- app$getSession()
+
 ses$sendCommand(str_c("charts.A1.legend.container(d3.select('#info').select('#legend')).legend.sampleHeight(30);",
                       "charts.A1.showLegend(true).update();"))
 ses$sendCommand('d3.selectAll("#legend").selectAll("text").attr("font-size", 17).attr("dy", 7)')
