@@ -63,10 +63,10 @@ tblWide %>%
   left_join(corners %>% rownames_to_column("corner")) %>%
   mutate(result = ifelse(diff > 0, "positive", "negative")) %>% 
   group_by(well96, plate) %>%
-  summarise(result = case_when(result[PrimerSet == "ACTB"] == "negative" ~ "failed",
-                               all(result[PrimerSet != "ACTB"] == "positive") ~ "positive",
-                               all(result[PrimerSet != "ACTB"] == "negative") ~ "negative",
-                               TRUE ~ "suspicious")) %>%
+  summarise(result = case_when(result[PrimerSet == "ACTB"] == "negative" ~ "control failed",
+                               all(result[PrimerSet != "ACTB"] == "positive") ~ "all positive",
+                               all(result[PrimerSet != "ACTB"] == "negative") ~ "all negative",
+                               TRUE ~ "mixed")) %>%
   mutate(plate = str_c("result_", plate)) %>%
   pivot_wider(names_from = plate, values_from = result) %>%
   right_join(contents) -> contents
@@ -79,7 +79,7 @@ palette <- list(sample = data.frame(colour = c("#1cb01c", "#c67c3b", "#4979e3", 
                                     type = c("positive control", "sample", "water", "empty"),
                                     stringsAsFactors = FALSE),
                 result = data.frame(colour = c("#48b225", "#d22d2d", "#270404", "#f58e09"),
-                                    type = c("negative", "positive", "failed", "suspicious"),
+                                    type = c("all negative", "all positive", "control failed", "mixed"),
                                     stringsAsFactors = FALSE))
 
 getOpacity <- function(highlighted) {
