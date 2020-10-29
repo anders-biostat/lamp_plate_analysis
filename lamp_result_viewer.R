@@ -78,8 +78,8 @@ colourBy <- "sample"
 palette <- list(sample = data.frame(colour = c("#1cb01c", "#c67c3b", "#4979e3", "#aeafb0"),
                                     type = c("positive control", "sample", "water", "empty"),
                                     stringsAsFactors = FALSE),
-                result = data.frame(colour = c("#48b225", "#d22d2d", "#270404", "#f58e09"),
-                                    type = c("all negative", "all positive", "control failed", "mixed"),
+                result = data.frame(colour = c("#48b225", "#f58e09", "#d22d2d", "#270404"),
+                                    type = c("all negative", "mixed", "all positive", "control failed"),
                                     stringsAsFactors = FALSE))
 
 getOpacity <- function(highlighted) {
@@ -96,7 +96,7 @@ getContent <- function(highlighted, plate) {
     ses$sendCommand("d3.select('#highlighted').classed('failed', false);")
     return("No highlighted lines")
   }
-  if(contents[highlighted, str_c("result_", plate)] == "failed") {
+  if(contents[highlighted, str_c("result_", plate)] == "control failed") {
     ses$sendCommand("d3.select('#highlighted').classed('failed', true);")
   } else {
     ses$sendCommand("d3.select('#highlighted').classed('failed', false);")
