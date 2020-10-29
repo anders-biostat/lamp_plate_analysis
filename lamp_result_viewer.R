@@ -57,7 +57,30 @@ readxl::excel_sheets( tecan_workbook ) %>%
   select(-od434, -od560, -row, -col, -row96, -col96, -well) %>%
   pivot_wider(names_from = well96, values_from = dOd) -> tblWide
 
+tblWide %>%
+  filter(minutes  == 20) %>%
+  pivot_longer(names_to = "well96", values_to = "diff", -(sheet:corner)) %>%
+  left_join(corners %>% rownames_to_column("corner")) %>%
+  mutate(result = ifelse(diff > 0, "positive", "negative")) %>%
+  group_by(well96, plate) %>%
+  summarise(result = case_when(result[PrimerSet == "ACTB"] == "negative" ~ "failed",
+                               all(result[PrimerSet != "ACTB"] == "positive") ~ "positive",
+                               all(result[PrimerSet != "ACTB"] == "negative") ~ "negative",
+                               TRUE ~ "suspicious")) %>%
+  mutate(plate = str_c("result_", plate)) %>%
+  pivot_wider(names_from = plate, values_from = result) %>%
+  right_join(contents) -> contents
+
 library( rlc )
+
+colourBy <- "sample"
+
+palette <- list(sample = data.frame(colour = c("#1cb01c", "#c67c3b", "#4979e3", "#aeafb0"),
+                                    type = c("positive control", "sample", "water", "empty"),
+                                    stringsAsFactors = FALSE),
+                result = data.frame(colour = c("#48b225", "#aa1b1b", "#270404", "#f58e09"),
+                                    type = c("positive", "negative", "failed", "suspicious"),
+                                    stringsAsFactors = FALSE))
 
 getOpacity <- function(highlighted) {
   if(highlighted == -1) {
@@ -80,7 +103,7 @@ getContent <- function(highlighted, plate) {
 clearHighlighted <- function() {
   if(highlighted == -1){
     updateCharts(chartId = c("A1", "A2", "B1", "B2", 
-                             unique(corners$plate)), 
+                             unique(corners$plate), str_c("res_", unique(corners$plate))), 
                  updateOnly = "ElementStyle")
     updateCharts("highlighted")
   }
@@ -97,7 +120,9 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
   
   lc_line(
     dat(opacity = getOpacity(highlighted),
-        lineWidth = ifelse(1:nrow(contents) == highlighted, 3, 1)),
+        lineWidth = ifelse(1:nrow(contents) == highlighted, 3, 1),
+        palette = palette[[colourBy]][["colour"]],
+        colourDomain = palette[[colourBy]][["type"]]),
     x = as.numeric(data$minutes),
     y = (select(data, -(sheet:corner)) %>% as.matrix())[, contents$well96],
     colourValue = contents[[str_c("content_", corners[cnr, "plate"])]],
@@ -106,8 +131,6 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
       cnr, corners[cnr, "plate"], corners[cnr, "PrimerSet"] ),
     transitionDuration = 0,
     showLegend = FALSE,
-    palette = c("#1cb01c", "#c67c3b", "#4979e3", "#aeafb0"),
-    colourDomain = c("positive control", "sample", "water", "empty"),
     height = 300,
     titleSize = 18,
     on_mouseover = function(d) {
@@ -119,7 +142,7 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
           if(corners[.chartId, "plate"] == corners[c, "plate"]){
             updateCharts(c, updateOnly = "ElementStyle")
           }
-        updateCharts(corners[.chartId, "plate"], updateOnly = "ElementStyle")
+        updateCharts(c(corners[.chartId, "plate"], str_c("res_", corners[.chartId, "plate"])), updateOnly = "ElementStyle")
       },
     on_mouseout = function(d) {
       highlighted <<- -1
@@ -135,8 +158,8 @@ for(pl in unique(corners$plate)){
     colourValue = contents[[str_c("content_", pl)]],
     title = str_interp("Plate ${pl}"),
     titleSize = 20,
-    palette = c("#1cb01c", "#c67c3b", "#4979e3", "#aeafb0"),
-    colourDomain = c("positive control", "sample", "water", "empty"),
+    palette = palette$sample$colour,
+    colourDomain = palette$sample$type,
     height = 350,
     width = 550,
     strokeWidth = 2,
@@ -149,16 +172,67 @@ for(pl in unique(corners$plate)){
           if(.chartId == corners[c, "plate"]){
             updateCharts(c, updateOnly = "ElementStyle")
           }
-        updateCharts(.chartId, updateOnly = "ElementStyle")
+        updateCharts(c(.chartId, str_c("res_", .chartId)), updateOnly = "ElementStyle")
       },
     on_mouseout = function() {
       highlighted <<- -1
       clearHighlighted()
     },
+    on_click = function(d) {
+      if(colourBy != "sample") {
+        colourBy <<- "sample"
+        for(cnr in c("A1", "A2", "B1", "B2")) {
+          setProperties(dat(colourValue = contents[[str_c("content_", corners[cnr, "plate"])]]), cnr)
+          updateCharts(cnr, updateOnly = "ElementStyle")
+        }
+      }
+    },
     showLegend = FALSE,
     transitionDuration = 0,
     size = 10,
     place = "plates", chartId = pl, with = contents)
+  
+  lc_scatter(dat(opacity = getOpacity(highlighted), 
+                 x = col96, y = row96Letter),
+             domainY = LETTERS[8:1],
+             colourValue = testResults[[pl]],
+             title = str_interp("Plate ${pl}"),
+             titleSize = 20,
+             palette = palette$result$colour,
+             colourDomain = palette$result$type,
+             height = 350,
+             width = 550,
+             strokeWidth = 2,
+             stroke = "black",
+             on_mouseover = function(d) {
+               highlighted <<- d
+               .chartId <- str_remove(.chartId, "res_")
+               plate <<- .chartId
+               updateCharts("highlighted")
+               for(c in c( "A1", "A2", "B1", "B2" ))
+                 if(.chartId == corners[c, "plate"]){
+                   updateCharts(c, updateOnly = "ElementStyle")
+                 }
+               updateCharts(c(.chartId, str_c("res_", .chartId)), updateOnly = "ElementStyle")
+             },
+             on_mouseout = function() {
+               highlighted <<- -1
+               clearHighlighted()
+             },
+             on_click = function(d) {
+               if(colourBy != "result") {
+                 colourBy <<- "result"
+                 for(cnr in c("A1", "A2", "B1", "B2")){
+                   setProperties(dat(colourValue = contents[[str_c("result_", corners[cnr, "plate"])]]), cnr)
+                   updateCharts(cnr, updateOnly = "ElementStyle")
+                 }
+               }
+             },
+             showLegend = FALSE,
+             transitionDuration = 0,
+             size = 10,
+             place = "plates", chartId = str_c("res_", pl), with = contents)
+  
 }
   
 
