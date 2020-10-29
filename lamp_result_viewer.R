@@ -78,8 +78,8 @@ colourBy <- "sample"
 palette <- list(sample = data.frame(colour = c("#1cb01c", "#c67c3b", "#4979e3", "#aeafb0"),
                                     type = c("positive control", "sample", "water", "empty"),
                                     stringsAsFactors = FALSE),
-                result = data.frame(colour = c("#48b225", "#aa1b1b", "#270404", "#f58e09"),
-                                    type = c("positive", "negative", "failed", "suspicious"),
+                result = data.frame(colour = c("#48b225", "#d22d2d", "#270404", "#f58e09"),
+                                    type = c("negative", "positive", "failed", "suspicious"),
                                     stringsAsFactors = FALSE))
 
 getOpacity <- function(highlighted) {
