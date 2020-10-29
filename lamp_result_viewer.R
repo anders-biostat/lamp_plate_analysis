@@ -249,9 +249,12 @@ for(pl in unique(corners$plate)){
 
 lc_html(dat(content = getContent(highlighted, plate)), place = "highlighted")
 
-ses$sendCommand(str_c("charts.A1.legend.container(d3.select('#info').select('#legend')).legend.sampleHeight(30);",
+ses$sendCommand(str_c("charts.A1.legend.container(d3.select('#info').select('#legend_sample')).legend.sampleHeight(30);",
                       "charts.A1.showLegend(true).update();"))
-ses$sendCommand('d3.selectAll("#legend").selectAll("text").attr("font-size", 17).attr("dy", 7)')
+ses$sendCommand(str_c("charts.res_", plate, ".legend.container(d3.select('#info').select('#legend_res')).legend.sampleHeight(30);",
+                      "charts.res_", plate, ".showLegend(true).update();"))
+ses$sendCommand('d3.selectAll("#legend_res").selectAll("text").attr("font-size", 17).attr("dy", 7)')
+ses$sendCommand('d3.selectAll("#legend_sample").selectAll("text").attr("font-size", 17).attr("dy", 7)')
 fileName <- basename(tecan_workbook)
 ses$sendCommand(str_interp('d3.select("h3").html("File: <i>${fileName}</i>")'))
 
