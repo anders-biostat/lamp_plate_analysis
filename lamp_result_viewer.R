@@ -1,6 +1,8 @@
 library( later )
 library( tidyverse )
 
+controls <- c("ACTB", "Actin", "Zika")
+
 tecan_workbook <- commandArgs(TRUE)[1]
 if(!file.exists(tecan_workbook))
   stop(str_c("File not found: ", tecan_workbook))
@@ -21,7 +23,9 @@ readxl::read_excel( tecan_workbook, "PrimerSetsUsed" ) %>%
   mutate_at( "plate", str_replace_all, "-", "." ) %>%
   column_to_rownames("corner") %>%
   as.data.frame() -> corners
-  
+
+query <- setdiff(unique(corners$PrimerSet), controls)
+
 readxl::read_excel( tecan_workbook, "Barcodes_SampleTypes" )  %>%
   rename( "well96" = "Tube Position", 
           "plate" = "Rack ID", 
@@ -58,15 +62,24 @@ readxl::excel_sheets( tecan_workbook ) %>%
   pivot_wider(names_from = well96, values_from = dOd) -> tblWide
 
 tblWide %>%
-  filter(minutes  == 20) %>%
   pivot_longer(names_to = "well96", values_to = "diff", -(sheet:corner)) %>%
+  group_by(well96, corner) %>%
+  mutate(baseline = mean(diff[minutes <= 10])) %>%
+  mutate(increase = diff - baseline) %>%
+  filter(minutes  == 20) %>%
   left_join(corners %>% rownames_to_column("corner")) %>%
-  mutate(result = ifelse(diff > 0, "positive", "negative")) %>% 
+  mutate(result = ifelse(increase > 0.5, "positive", "negative"),
+         isControl = PrimerSet %in% controls) %>% 
   group_by(well96, plate) %>%
-  summarise(result = case_when(result[PrimerSet == "ACTB"] == "negative" ~ "control failed",
-                               all(result[PrimerSet != "ACTB"] == "positive") ~ "all positive",
-                               all(result[PrimerSet != "ACTB"] == "negative") ~ "all negative",
-                               TRUE ~ "mixed")) %>%
+  summarise(positiveTest = sum(result == "positive" & !isControl),
+            positiveControl = sum(result == "positive" & isControl),
+            totalTest = sum(!isControl),
+            totalControl = sum(isControl)) %>%
+  mutate(result = case_when(positiveTest == totalTest ~ "all positive",
+                   positiveControl < totalControl ~ "control failed",
+                   positiveTest == 0 ~ "all negative",
+                   TRUE ~ "mixed")) %>%
+  select(-(positiveTest:totalControl)) %>%
   mutate(plate = str_c("result_", plate)) %>%
   pivot_wider(names_from = plate, values_from = result) %>%
   right_join(contents) -> contents
