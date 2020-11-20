@@ -9,10 +9,10 @@ if(!file.exists(tecan_workbook))
 
 read_tecan_sheet <- function( filename, sheet ) {
   inner_join( by="well",
-    readxl::read_excel( filename, sheet, skip=22, n_max=384 ) %>%
+    readxl::read_excel( filename, sheet, skip=24, n_max=384 ) %>%
       assertr::verify( identical( colnames(.), c( "<>", "Value" ) ) ) %>%
       rename( "well" = "<>", "od434" = "Value" ),
-    readxl::read_excel( filename, sheet, skip=423, n_max=384 ) %>%
+    readxl::read_excel( filename, sheet, skip=425, n_max=384 ) %>%
       assertr::verify( identical( colnames(.), c( "<>", "Value" ) ) ) %>%
       rename( "well" = "<>", "od560" = "Value" ) )
 }
@@ -27,8 +27,8 @@ readxl::read_excel( tecan_workbook, "PrimerSetsUsed" ) %>%
 query <- setdiff(unique(corners$PrimerSet), controls)
 
 readxl::read_excel( tecan_workbook, "Barcodes_SampleTypes" )  %>%
-  rename( "well96" = "Tube Position", 
-          "plate" = "Rack ID", 
+  rename( "well96" = "Tube Position",
+          "plate" = "Rack ID",
           "content" = "Type",
           "tubeId" = "Tube ID") %>%
   mutate_at( "plate", str_replace_all, " ", "_" ) %>%
@@ -69,7 +69,7 @@ tblWide %>%
   filter(minutes  == 20) %>%
   left_join(corners %>% rownames_to_column("corner")) %>%
   mutate(result = ifelse(increase > 0.5, "positive", "negative"),
-         isControl = PrimerSet %in% controls) %>% 
+         isControl = PrimerSet %in% controls) %>%
   group_by(well96, plate) %>%
   summarise(positiveTest = sum(result == "positive" & !isControl),
             positiveControl = sum(result == "positive" & isControl),
@@ -116,16 +116,16 @@ getContent <- function(highlighted, plate) {
   }
   str_c(str_replace_na(c("Highlighted: ", contents[[str_c("tubeId_", plate)]][highlighted], "<br>",
                          "96 well position: ", contents$well96[highlighted], "<br>",
-                         "384 well position: ", contents[highlighted, c("A1", "A2", "B1", "B2")] %>% 
-                           unlist %>% 
-                           str_c(collapse = ", "))), 
+                         "384 well position: ", contents[highlighted, c("A1", "A2", "B1", "B2")] %>%
+                           unlist %>%
+                           str_c(collapse = ", "))),
         collapse = "")
-  
+
 }
 clearHighlighted <- function() {
   if(highlighted == -1){
-    updateCharts(chartId = c("A1", "A2", "B1", "B2", 
-                             unique(corners$plate), str_c("res_", unique(corners$plate))), 
+    updateCharts(chartId = c("A1", "A2", "B1", "B2",
+                             unique(corners$plate), str_c("res_", unique(corners$plate))),
                  updateOnly = "ElementStyle")
     updateCharts("highlighted")
     ses$sendCommand("d3.select('#highlighted').classed('failed', false);")
@@ -141,7 +141,7 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
   data <- filter(tblWide, corner == cnr)
   highlighted <- -1
   plate <- corners$plate[1]
-  
+
   lc_line(
     dat(opacity = getOpacity(highlighted),
         lineWidth = ifelse(1:nrow(contents) == highlighted, 3, 1),
@@ -176,7 +176,7 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
 }
 
 for(pl in unique(corners$plate)){
-  lc_scatter(dat(opacity = getOpacity(highlighted), 
+  lc_scatter(dat(opacity = getOpacity(highlighted),
                  x = col96, y = row96Letter),
     domainY = LETTERS[8:1],
     colourValue = contents[[str_c("content_", pl)]],
@@ -215,8 +215,8 @@ for(pl in unique(corners$plate)){
     transitionDuration = 0,
     size = 10,
     place = "plates", chartId = pl, with = contents)
-  
-  lc_scatter(dat(opacity = getOpacity(highlighted), 
+
+  lc_scatter(dat(opacity = getOpacity(highlighted),
                  x = col96, y = row96Letter),
              domainY = LETTERS[8:1],
              colourValue = contents[[str_c("result_", pl)]],
@@ -256,9 +256,9 @@ for(pl in unique(corners$plate)){
              transitionDuration = 0,
              size = 10,
              place = "plates", chartId = str_c("res_", pl), with = contents)
-  
+
 }
-  
+
 
 lc_html(dat(content = getContent(highlighted, plate)), place = "highlighted")
 
