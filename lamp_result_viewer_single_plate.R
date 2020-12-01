@@ -9,10 +9,10 @@ if(!file.exists(tecan_workbook))
 
 read_tecan_sheet <- function( filename, sheet ) {
   inner_join( by="well",
-    readxl::read_excel( filename, sheet, skip=22, n_max=384 ) %>%
+    readxl::read_excel( filename, sheet, skip=24, n_max=384 ) %>%
       assertr::verify( identical( colnames(.), c( "<>", "Value" ) ) ) %>%
       rename( "well" = "<>", "od434" = "Value" ),
-    readxl::read_excel( filename, sheet, skip=423, n_max=384 ) %>%
+    readxl::read_excel( filename, sheet, skip=425, n_max=384 ) %>%
       assertr::verify( identical( colnames(.), c( "<>", "Value" ) ) ) %>%
       rename( "well" = "<>", "od560" = "Value" ) )
 }
@@ -20,11 +20,7 @@ read_tecan_sheet <- function( filename, sheet ) {
 readxl::read_excel( tecan_workbook, "PrimerSetsUsed" ) %>%
   rename( "plate"="Plate-ID", "corner" = "A1 position of 96-well in 384-well" ) %>%
   mutate_at( "plate", str_replace_all, " ", "_" ) %>%
-  mutate_at( "plate", str_replace_all, "-", "." ) %>%
-  column_to_rownames("corner") %>%
-  as.data.frame() -> corners
-
-query <- setdiff(unique(corners$PrimerSet), controls)
+  mutate_at( "plate", str_replace_all, "-", "." ) -> corners_all
 
 readxl::read_excel( tecan_workbook, "Barcodes_SampleTypes" )  %>%
   rename( "well96" = "Tube Position", 
@@ -33,15 +29,21 @@ readxl::read_excel( tecan_workbook, "Barcodes_SampleTypes" )  %>%
           "tubeId" = "Tube ID") %>%
   mutate_at( "plate", str_replace_all, " ", "_" ) %>%
   mutate_at( "plate", str_replace_all, "-", "." ) %>%
-  mutate_at( "well96", str_replace, "0(\\d+)", "\\1" ) -> contents
+  mutate_at( "well96", str_replace, "0(\\d+)", "\\1" ) -> contents_all
 
-if(length(setdiff(corners$plate, contents$plate)) > 0)
+if(length(setdiff(corners_all$plate, contents_all$plate)) > 0)
   stop(str_interp("Content information is missing for the following plates: ${setdiff(corners$plate, contents$plate)}"))
 
 readxl::excel_sheets( tecan_workbook ) %>%
   { tibble( sheet = . ) } %>%
-  mutate( minutes = str_match( sheet, "(\\d+)\\w*((min)?)" ) %>% `[`(,2) ) %>%
-  filter( !is.na( minutes ) ) %>%
+  filter(!(sheet %in% c("PrimerSetsUsed", "Barcodes_SampleTypes"))) %>%
+  group_by_all() %>%
+  summarise(header = readxl::read_excel(tecan_workbook, sheet, skip = 12, col_names = FALSE)[["...5"]][1:2]) %>%
+  mutate(type = c("plate", "minutes")) %>%
+  pivot_wider(names_from = type, values_from = header) %>%
+  mutate_at( "plate", str_replace_all, " ", "_" ) %>%
+  mutate_at( "plate", str_replace_all, "-", "." ) %>%
+  mutate( minutes = str_match( minutes, "(\\d+)\\w*((min)?)" ) %>% `[`(,2) ) %>%
   group_by_all() %>%
   summarise( a = list( read_tecan_sheet( tecan_workbook, sheet ) ), .groups = "drop" ) %>%
   unnest( a ) %>%
@@ -52,21 +54,21 @@ readxl::excel_sheets( tecan_workbook ) %>%
   mutate( well96 = str_c( LETTERS[row96], col96 ) ) %>%
   mutate( corner = str_c( LETTERS[ 1 + (row+1) %% 2 ], 1 + (col+1) %% 2 ) ) %>%
   mutate(dOd = od434 - od560) %T>%
-  {contents <<- select(., well, well96, corner, row96, col96) %>%
+  {contents_all <<- select(., well, well96, corner, row96, col96, plate) %>%
     distinct() %>%
     mutate(row96Letter = LETTERS[row96]) %>%
     pivot_wider(names_from = corner, values_from = well) %>%
-    left_join(contents)} %>%
+    left_join(contents_all)} %>%
   select(-od434, -od560, -row, -col, -row96, -col96, -well) %>%
-  pivot_wider(names_from = well96, values_from = dOd) -> tblWide
+  pivot_wider(names_from = well96, values_from = dOd) -> tblWide_all
 
-tblWide %>%
+tblWide_all %>%
   pivot_longer(names_to = "well96", values_to = "diff", -(sheet:corner)) %>%
   group_by(well96, corner) %>%
   mutate(baseline = mean(diff[minutes <= 10])) %>%
   mutate(increase = diff - baseline) %>%
   filter(minutes  == 20) %>%
-  left_join(corners %>% rownames_to_column("corner")) %>%
+  left_join(corners_all) %>%
   mutate(result = ifelse(increase > 0.5, "positive", "negative"),
          isControl = PrimerSet %in% controls) %>% 
   group_by(well96, plate) %>%
@@ -80,14 +82,15 @@ tblWide %>%
                    TRUE ~ "repeat")) %>%
   select(-(positiveTest:totalControl)) %>%
   mutate(comment = "", assigned = result) %>%
-  right_join(contents) -> contents
+  right_join(contents_all) %>%
+  mutate(content = ifelse(str_detect(content, "^positive"), "positive control", content)) -> contents_all
 
 library( rlc )
 
 colourBy <- "content"
 
 palette <- list(content = data.frame(colour = c("#1cb01c", "#c67c3b", "#4979e3", "#aeafb0"),
-                                    type = c("positive control", "sample", "water", "empty"),
+                                    type = c("positive control", "sample", "negative control", "empty"),
                                     stringsAsFactors = FALSE),
                 assigned = data.frame(colour = c("#48b225", "#f58e09", "#d22d2d", "#270404"),
                                     type = c("negative", "repeat", "positive", "failed"),
@@ -161,7 +164,8 @@ reset <- function() {
 
 export <- function() {
   contents %>%
-    select(well96, tubeId, content, assigned, comment) %>%
+    filter(content == "sample") %>%
+    select(well96, tubeId, assigned, comment) %>%
     rename(result = assigned) %>%
     mutate(LAMPStatus = case_when(result == "positive" ~ "LAMPPOS",
                                   result == "negative" ~ "LAMPNEG",
@@ -170,6 +174,13 @@ export <- function() {
                                   TRUE ~ NA)) %>%
     write_csv(str_replace(tecan_workbook, "\\.\\w+$", ".csv"))
 }
+
+plates <- unique(corners_all$plate)
+pl <- plates[1]
+contents <- filter(contents_all, plate == pl)
+tblWide <- filter(tblWide_all, plate == pl)
+corners <- filter(corners_all, plate == pl) %>%
+  column_to_rownames("corner")
 
 last <- function() {}
 loop <- create_loop()
