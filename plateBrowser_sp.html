@@ -75,8 +75,8 @@
 				<span style="background: #270404;" onclick="jrc.callFunction('assign', 'control failed');">f</span>
 			</p>
 			<p>
-				add comment: <input type="text" name="comment">
-				<button onclick="jrc.callFunction('comment', );">Add</button>
+				add comment: <input type="text" name="comment" id="comment">
+				<button onclick="jrc.callFunction('comment', document.getElementById('comment').value);">Add</button>
 			</p>
 			<button>Export</button>
 		</div>	

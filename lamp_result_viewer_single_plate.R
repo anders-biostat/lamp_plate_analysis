@@ -116,7 +116,8 @@ getContent <- function(highlighted) {
                          "96 well position: ", contents$well96[highlighted], "<br>",
                          "384 well position: ", contents[highlighted, c("A1", "A2", "B1", "B2")] %>% 
                            unlist %>% 
-                           str_c(collapse = ", "))), 
+                           str_c(collapse = ", "), "<br><i>",
+                         contents$comment[highlighted], "</i>")), 
         collapse = "")
   
 }
@@ -130,7 +131,6 @@ clearHighlighted <- function() {
 }
 
 assign <- function(new_type) {
-  print(new_type)
   wells <- unique(c(getMarked("content"), getMarked("assigned")))
   if(length(wells) > 0){
     mark(c(), "content")
@@ -143,10 +143,21 @@ assign <- function(new_type) {
   }
 }
 
+comment <- function(comment) {
+  wells <- unique(c(getMarked("content"), getMarked("assigned")))
+  if(length(wells) > 0){
+    mark(c(), "content")
+    mark(c(), "assigned")
+    contents[wells, "comment"] <- new_type
+    contents <<- contents    
+  }
+}
+
 last <- function() {}
 loop <- create_loop()
 
-app <- openPage( FALSE, startPage = "plateBrowser_sp.html", allowedFunctions = "assign")
+app <- openPage( FALSE, startPage = "plateBrowser_sp.html", 
+                 allowedFunctions = c("assign", "comment", "export"))
 ses <- app$getSession()
 
 allCharts <- c("A1", "A2", "B1", "B2", "assigned", "content")
