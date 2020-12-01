@@ -131,7 +131,7 @@ clearHighlighted <- function() {
 last <- function() {}
 loop <- create_loop()
 
-app <- openPage( FALSE, startPage = "plateBrowser.html" )
+app <- openPage( FALSE, startPage = "plateBrowser_sp.html" )
 ses <- app$getSession()
 
 allCharts <- c("A1", "A2", "B1", "B2", "assigned", "content")

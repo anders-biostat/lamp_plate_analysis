@@ -1,0 +1,85 @@
+<head>
+	<title>Plate Browser</title>
+	<style type="text/css">
+		body {
+			font-family: Helvetica, Arial, sans-serif;
+		}
+		a {
+			text-decoration: none;
+			color: #c21210;
+		}
+		a:hover {
+			color: #5c0807;
+		}
+		h3 {
+			font-weight: normal;
+			text-align: center;
+		}
+		#info #highlighted {
+			font-size: 14pt;
+			border: 1px solid black;
+			padding: 15px 20px 15px 20px;
+			width: 340px;
+		}
+		#highlighted .linked-charts {
+			line-height: 1.4;
+		}
+		.failed {
+			background: #f1a3a3;
+		}
+		.assign span {
+			display: inline-block;
+			width: 30px;
+			text-align: center;
+			height: 30px;
+			font-weight: bold;
+			font-size: 150%;
+			color: #666;
+		}
+		.assign span:hover {
+			opacity: 0.7;
+		}
+	</style>
+</head>
+<body>
+	<h2 style="text-align: center;">LAMP results viewer</h2>
+	<h3>Opened file:</h3>
+	<div style="display: grid;">
+		<div id="lines" style="grid-column: 1; grid-row: 1">
+			<table>
+				<tr>
+					<td id="A1"></td>
+					<td id="A2"></td>
+				</tr>
+				<tr>
+					<td id="B1"></td>
+					<td id="B2"></td>
+				</tr>
+			</table>			
+		</div>
+		<div id="plates" style="grid-column: 2; grid-row: 1;"></div>
+		<div id="info" style="grid-column: 1; grid-row: 2; padding-left: 150px">
+			<table>
+				<tr>
+					<td id="legend_sample"></td>
+					<td id="highlighted"></td>
+					<td id="legend_res"></td>
+				</tr>
+			</table>
+		</div>
+		<div class="assign" style="grid-column: 2; grid-row: 2">
+			<p>mark as: 
+				<span style="background: #d22d2d;" onclick="jrc.callFunction('assign', 'all positive');">p</span>
+				<span style="background: #f58e09;" onclick="jrc.callFunction('assign', 'mixed');">w</span>
+				<span style="background: #48b225;" onclick="jrc.callFunction('assign', 'all negative');">n</span>
+				<span style="background: #270404;" onclick="jrc.callFunction('assign', 'control failed');">f</span>
+			</p>
+			<p>
+				add comment: <input type="text" name="comment">
+				<button onclick="jrc.callFunction('comment', );">Add</button>
+			</p>
+			<button>Export</button>
+		</div>	
+	</div>
+	<div style="padding-top: 20px; font-size: 80%; font-style: italic;">Made with <a href="anders-biostat.github.io/linked-charts">R/Linked-Charts</a> by S.Ovchinnikova and S.Anders, ZMBH</div>
+</body>
