@@ -78,7 +78,8 @@
 				add comment: <input type="text" name="comment" id="comment">
 				<button onclick="jrc.callFunction('comment', document.getElementById('comment').value);">Add</button>
 			</p>
-			<button>Export</button>
+			<button onclick="jrc.callFunction('export')">Export</button>
+			<button onclick="jrc.callFunction('reset')">Reset</button>
 		</div>	
 	</div>
 	<div style="padding-top: 20px; font-size: 80%; font-style: italic;">Made with <a href="anders-biostat.github.io/linked-charts">R/Linked-Charts</a> by S.Ovchinnikova and S.Anders, ZMBH</div>

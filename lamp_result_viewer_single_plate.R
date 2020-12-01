@@ -143,21 +143,34 @@ assign <- function(new_type) {
   }
 }
 
-comment <- function(comment) {
+comment <- function(com = NULL) {
   wells <- unique(c(getMarked("content"), getMarked("assigned")))
-  if(length(wells) > 0){
+  if(length(wells) > 0 & !is.null(com)){
     mark(c(), "content")
     mark(c(), "assigned")
-    contents[wells, "comment"] <- new_type
+    contents[wells, "comment"] <- com
     contents <<- contents    
   }
+}
+
+reset <- function() {
+  contents$assigned <- contents$result
+  contents <<- contents
+  updateCharts(allCharts, updateOnly="ElementStyle")
+}
+
+export <- function() {
+  contents %>%
+    select(well96, tubeId, content, assigned, comment) %>%
+    rename(result = assigned) %>%
+    write_csv(str_replace(tecan_workbook, "\\.\\w+$", ".csv"))
 }
 
 last <- function() {}
 loop <- create_loop()
 
 app <- openPage( FALSE, startPage = "plateBrowser_sp.html", 
-                 allowedFunctions = c("assign", "comment", "export"))
+                 allowedFunctions = c("assign", "comment", "export", "reset"))
 ses <- app$getSession()
 
 allCharts <- c("A1", "A2", "B1", "B2", "assigned", "content")
