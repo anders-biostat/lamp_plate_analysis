@@ -128,10 +128,25 @@ clearHighlighted <- function() {
     ses$sendCommand("d3.select('#highlighted').classed('failed', false);")
   }
 }
+
+assign <- function(new_type) {
+  print(new_type)
+  wells <- unique(c(getMarked("content"), getMarked("assigned")))
+  if(length(wells) > 0){
+    mark(c(), "content")
+    mark(c(), "assigned")
+    contents[wells, "assigned"] <- new_type
+    contents <<- contents
+    updateCharts("assigned", updateOnly = "ElementStyle")
+    if(colourBy == "result")
+      updateCharts(c("A1", "A2", "B1", "B2"), updateOnly = "ElementStyle")
+  }
+}
+
 last <- function() {}
 loop <- create_loop()
 
-app <- openPage( FALSE, startPage = "plateBrowser_sp.html" )
+app <- openPage( FALSE, startPage = "plateBrowser_sp.html", allowedFunctions = "assign")
 ses <- app$getSession()
 
 allCharts <- c("A1", "A2", "B1", "B2", "assigned", "content")
