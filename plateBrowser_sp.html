@@ -40,10 +40,20 @@
 			opacity: 0.7;
 		}
 	</style>
+	<script type="text/javascript">
+		function addPlates(plates, tmp) {
+			d3.select("#rackIds").selectAll("option").data(plates)
+				.enter()
+				.append("option")
+					.attr("value", d => d)
+					.text(d => d);
+		}
+	</script>
 </head>
 <body>
 	<div style="position: absolute;">
-		<select id="rackIds"></select>
+		Select a plate to display:
+		<select id="rackIds" onchange="jrc.callFunction('switchPlate', this.value);" style="width: 100px;"></select>
 	</div>
 	<h2 style="text-align: center;">LAMP results viewer</h2>
 	<h3>Opened file:</h3>

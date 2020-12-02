@@ -18,17 +18,13 @@ read_tecan_sheet <- function( filename, sheet ) {
 }
 
 readxl::read_excel( tecan_workbook, "PrimerSetsUsed" ) %>%
-  rename( "plate"="Plate-ID", "corner" = "A1 position of 96-well in 384-well" ) %>%
-  mutate_at( "plate", str_replace_all, " ", "_" ) %>%
-  mutate_at( "plate", str_replace_all, "-", "." ) -> corners_all
+  rename( "plate"="Plate-ID", "corner" = "A1 position of 96-well in 384-well" ) -> corners_all
 
 readxl::read_excel( tecan_workbook, "Barcodes_SampleTypes" )  %>%
   rename( "well96" = "Tube Position", 
           "plate" = "Rack ID", 
           "content" = "Type",
           "tubeId" = "Tube ID") %>%
-  mutate_at( "plate", str_replace_all, " ", "_" ) %>%
-  mutate_at( "plate", str_replace_all, "-", "." ) %>%
   mutate_at( "well96", str_replace, "0(\\d+)", "\\1" ) -> contents_all
 
 if(length(setdiff(corners_all$plate, contents_all$plate)) > 0)
@@ -41,8 +37,6 @@ readxl::excel_sheets( tecan_workbook ) %>%
   summarise(header = readxl::read_excel(tecan_workbook, sheet, skip = 12, col_names = FALSE)[["...5"]][1:2]) %>%
   mutate(type = c("plate", "minutes")) %>%
   pivot_wider(names_from = type, values_from = header) %>%
-  mutate_at( "plate", str_replace_all, " ", "_" ) %>%
-  mutate_at( "plate", str_replace_all, "-", "." ) %>%
   mutate( minutes = str_match( minutes, "(\\d+)\\w*((min)?)" ) %>% `[`(,2) ) %>%
   group_by_all() %>%
   summarise( a = list( read_tecan_sheet( tecan_workbook, sheet ) ), .groups = "drop" ) %>%
@@ -64,20 +58,20 @@ readxl::excel_sheets( tecan_workbook ) %>%
 
 tblWide_all %>%
   pivot_longer(names_to = "well96", values_to = "diff", -(sheet:corner)) %>%
-  group_by(well96, corner) %>%
+  group_by(well96, corner, plate) %>%
   mutate(baseline = mean(diff[minutes <= 10])) %>%
   mutate(increase = diff - baseline) %>%
-  filter(minutes  == 20) %>%
+  filter(minutes == 25) %>%
   left_join(corners_all) %>%
-  mutate(result = ifelse(increase > 0.5, "positive", "negative"),
+  mutate(result = ifelse(increase > 0.4, "positive", "negative"),
          isControl = PrimerSet %in% controls) %>% 
-  group_by(well96, plate) %>%
+  group_by(well96, plate) %>% 
   summarise(positiveTest = sum(result == "positive" & !isControl),
             positiveControl = sum(result == "positive" & isControl),
             totalTest = sum(!isControl),
             totalControl = sum(isControl)) %>%
   mutate(result = case_when(positiveTest == totalTest ~ "positive",
-                   positiveControl < totalControl ~ "failed",
+                   positiveControl < totalControl ~ "repeat",
                    positiveTest == 0 ~ "negative",
                    TRUE ~ "repeat")) %>%
   select(-(positiveTest:totalControl)) %>%
@@ -88,6 +82,7 @@ tblWide_all %>%
 library( rlc )
 
 colourBy <- "content"
+highlighted <- -1
 
 palette <- list(content = data.frame(colour = c("#1cb01c", "#c67c3b", "#4979e3", "#aeafb0"),
                                     type = c("positive control", "sample", "negative control", "empty"),
@@ -99,8 +94,10 @@ palette <- list(content = data.frame(colour = c("#1cb01c", "#c67c3b", "#4979e3",
 getOpacity <- function(highlighted) {
   if(highlighted == -1) {
     op <- rep(1, nrow(contents))
+    op[contents$content == "empty"] <- 0.05
   } else {
     op <- rep(0.2, nrow(contents))
+    op[contents$content == "empty"] <- 0.05
     op[highlighted] <- 1
   }
   op
@@ -110,7 +107,7 @@ getContent <- function(highlighted) {
     ses$sendCommand("d3.select('#highlighted').classed('failed', false);")
     return("No highlighted lines")
   }
-  if(contents$result[highlighted] == "control failed") {
+  if(contents$result[highlighted] == "failed") {
     ses$sendCommand("d3.select('#highlighted').classed('failed', true);")
   } else {
     ses$sendCommand("d3.select('#highlighted').classed('failed', false);")
@@ -163,50 +160,78 @@ reset <- function() {
 }
 
 export <- function() {
-  contents %>%
+  saveAssignment()
+  contents_all %>%
     filter(content == "sample") %>%
-    select(well96, tubeId, assigned, comment) %>%
     rename(result = assigned) %>%
     mutate(LAMPStatus = case_when(result == "positive" ~ "LAMPPOS",
                                   result == "negative" ~ "LAMPNEG",
                                   result == "repeat" ~ "WAIT",
-                                  result == "failed" ~ "LAMPWAIT",
-                                  TRUE ~ NA)) %>%
+                                  result == "failed" ~ "LAMPFAILED")) %>%
+    select(plate, well96, tubeId, result, LAMPStatus, comment) %>%
     write_csv(str_replace(tecan_workbook, "\\.\\w+$", ".csv"))
 }
 
+saveAssignment <- function() {
+  contents_all <<- left_join(contents_all, select(contents, assigned, comment, plate, well96), 
+                             by = c("plate", "well96"), suffix = c("", "_new")) %>%
+    mutate(comment = if_else(is.na(comment_new), comment, comment_new),
+           assigned = if_else(is.na(assigned_new), assigned, assigned_new)) %>%
+    select(-assigned_new, -comment_new)
+  
+}
+
+switchPlate <- function(pl) {
+  if(pl %in% plates) {
+    saveAssignment()
+    contents <<- filter(contents_all, plate == pl)
+    tblWide <<- filter(tblWide_all, plate == pl)
+    corners <<- filter(corners_all, plate == pl) %>%
+      column_to_rownames("corner")
+    updateCharts(allCharts)
+  }
+}
+
+getX <- function(cnr) {
+  parse(text = str_c("as.numeric(filter(tblWide, corner == '", cnr, "') %>% pull(minutes))"))
+}
+getY <- function(cnr) {
+  parse(text = str_c("(filter(tblWide, corner == '", cnr, "') %>% select(-(sheet:corner)) %>% as.matrix())[, contents$well96]"))
+}
+
+getTitle <- function(cnr) {
+  parse(text = str_c('sprintf( "corner %s: plate %s, primer set %s", "', cnr, 
+                      '", corners["', cnr, '", "plate"], corners["', cnr, '", "PrimerSet"] )'))
+}
+
 plates <- unique(corners_all$plate)
-pl <- plates[1]
-contents <- filter(contents_all, plate == pl)
-tblWide <- filter(tblWide_all, plate == pl)
-corners <- filter(corners_all, plate == pl) %>%
+contents <- filter(contents_all, plate == plates[1])
+tblWide <- filter(tblWide_all, plate == plates[1])
+corners <- filter(corners_all, plate == plates[1]) %>%
   column_to_rownames("corner")
 
 last <- function() {}
 loop <- create_loop()
 
 app <- openPage( FALSE, startPage = "plateBrowser_sp.html", 
-                 allowedFunctions = c("assign", "comment", "export", "reset"))
+                 allowedFunctions = c("assign", "comment", "export", "reset", "switchPlate"))
 ses <- app$getSession()
+
+ses$callFunction("addPlates", list(plates, 1))
 
 allCharts <- c("A1", "A2", "B1", "B2", "assigned", "content")
 
 for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
-  data <- filter(tblWide, corner == cnr)
-  highlighted <- -1
-  plate <- corners$plate[1]
-  
   lc_line(
     dat(opacity = getOpacity(highlighted),
         lineWidth = ifelse(1:nrow(contents) == highlighted, 3, 1),
         palette = palette[[colourBy]][["colour"]],
         colourDomain = palette[[colourBy]][["type"]],
         colourValue = contents[[colourBy]]),
-    x = as.numeric(data$minutes),
-    y = (select(data, -(sheet:corner)) %>% as.matrix())[, contents$well96],
+    x = getX(cnr),
+    y = getY(cnr),
+    title = getTitle(cnr),
     mode = "canvas",
-    title = sprintf( "corner %s: plate %s, primer set %s",
-      cnr, corners[cnr, "plate"], corners[cnr, "PrimerSet"] ),
     transitionDuration = 0,
     showLegend = FALSE,
     height = 300,
@@ -225,10 +250,10 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
 }
 
 lc_scatter(dat(opacity = getOpacity(highlighted), 
-               x = col96, y = row96Letter,
-               colourValue = content),
+               x = contents$col96, y = contents$row96Letter,
+               colourValue = contents$content,
+               title = str_c("Plate ", corners$plate[1])),
   domainY = LETTERS[8:1],
-  title = str_c("Plate ", corners$plate[1]),    
   titleSize = 20,
   palette = palette$content$colour,
   colourDomain = palette$content$type,
@@ -258,10 +283,11 @@ lc_scatter(dat(opacity = getOpacity(highlighted),
   showLegend = FALSE,
   transitionDuration = 0,
   size = 10,
-  place = "plates", chartId = "content", with = contents)
+  place = "plates", chartId = "content")
 
 lc_scatter(dat(opacity = getOpacity(highlighted), 
-               x = col96, y = row96Letter, colourValue = assigned),
+               x = contents$col96, y = contents$row96Letter, 
+               colourValue = contents$assigned),
            domainY = LETTERS[8:1],
            palette = palette$assigned$colour,
            colourDomain = palette$assigned$type,
@@ -292,7 +318,7 @@ lc_scatter(dat(opacity = getOpacity(highlighted),
            showLegend = FALSE,
            transitionDuration = 0,
            size = 10,
-           place = "plates", chartId = "assigned", with = contents)
+           place = "plates", chartId = "assigned")
 
 lc_html(dat(content = getContent(highlighted)), place = "highlighted")
 
