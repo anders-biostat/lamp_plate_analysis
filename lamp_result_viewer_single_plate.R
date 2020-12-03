@@ -161,6 +161,8 @@ reset <- function() {
 
 export <- function() {
   saveAssignment()
+  file_name <- str_c(format(Sys.time(), "%y%m%d_%H%M%S_"),
+                     str_replace(basename(tecan_workbook), "\\.\\w+$", ".csv"))
   contents_all %>%
     filter(content == "sample") %>%
     select(-result) %>%
@@ -171,8 +173,10 @@ export <- function() {
                                   result == "failed" ~ "LAMPFAILED",
                                   result == "inconclusive" ~ "LAMPINC")) %>%
     select(plate, well96, tubeId, result, LAMPStatus, comment) %>%
-    write_csv(str_replace(tecan_workbook, "\\.\\w+$", ".csv"))
+    write_csv(file.path(dirname(tecan_workbook), file_name))
 }
+
+format(Sys.time(), "%y%m%d_%H%M%S_")
 
 saveAssignment <- function() {
   contents_all <<- left_join(contents_all, select(contents, assigned, comment, plate, well96), 
