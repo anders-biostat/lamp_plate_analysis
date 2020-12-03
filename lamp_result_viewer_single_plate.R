@@ -73,7 +73,7 @@ tblWide_all %>%
   mutate(result = case_when(positiveTest == totalTest ~ "positive",
                    positiveControl < totalControl ~ "repeat",
                    positiveTest == 0 ~ "negative",
-                   TRUE ~ "repeat")) %>%
+                   TRUE ~ "inconclusive")) %>%
   select(-(positiveTest:totalControl)) %>%
   mutate(comment = "", assigned = result) %>%
   right_join(contents_all) %>%
@@ -87,8 +87,8 @@ highlighted <- -1
 palette <- list(content = data.frame(colour = c("#1cb01c", "#c67c3b", "#4979e3", "#aeafb0"),
                                     type = c("positive control", "sample", "negative control", "empty"),
                                     stringsAsFactors = FALSE),
-                assigned = data.frame(colour = c("#48b225", "#f58e09", "#d22d2d", "#270404"),
-                                    type = c("negative", "repeat", "positive", "failed"),
+                assigned = data.frame(colour = c("#48b225", "#f58e09", "#d22d2d", "#194689", "#270404"),
+                                    type = c("negative", "inconclusive", "positive", "repeat", "failed"),
                                     stringsAsFactors = FALSE))
 
 getOpacity <- function(highlighted) {
@@ -168,7 +168,8 @@ export <- function() {
     mutate(LAMPStatus = case_when(result == "positive" ~ "LAMPPOS",
                                   result == "negative" ~ "LAMPNEG",
                                   result == "repeat" ~ "WAIT",
-                                  result == "failed" ~ "LAMPFAILED")) %>%
+                                  result == "failed" ~ "LAMPFAILED",
+                                  result == "inconclusive" ~ "LAMPINC")) %>%
     select(plate, well96, tubeId, result, LAMPStatus, comment) %>%
     write_csv(str_replace(tecan_workbook, "\\.\\w+$", ".csv"))
 }
