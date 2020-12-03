@@ -85,7 +85,7 @@ highlighted <- -1
 
 palette <- list(content = data.frame(colour = c("#79dd79", "#1cb01c", "#0e580e",
                                                 "#c67c3b", "#4979e3", "#aeafb0"),
-                                    type = c("positive control CT26", "positive control CT29", "positive control CT32", 
+                                    type = c("positive control CT32", "positive control CT29", "positive control CT26", 
                                              "sample", "negative control", "empty"),
                                     stringsAsFactors = FALSE),
                 assigned = data.frame(colour = c("#48b225", "#f58e09", "#d22d2d", "#194689", "#270404"),
