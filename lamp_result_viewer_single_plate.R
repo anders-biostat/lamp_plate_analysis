@@ -163,6 +163,7 @@ export <- function() {
   saveAssignment()
   contents_all %>%
     filter(content == "sample") %>%
+    select(-result) %>%
     rename(result = assigned) %>%
     mutate(LAMPStatus = case_when(result == "positive" ~ "LAMPPOS",
                                   result == "negative" ~ "LAMPNEG",
