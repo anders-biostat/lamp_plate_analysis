@@ -76,16 +76,17 @@ tblWide_all %>%
                    TRUE ~ "inconclusive")) %>%
   select(-(positiveTest:totalControl)) %>%
   mutate(comment = "", assigned = result) %>%
-  right_join(contents_all) %>%
-  mutate(content = ifelse(str_detect(content, "^positive"), "positive control", content)) -> contents_all
+  right_join(contents_all) -> contents_all
 
 library( rlc )
 
 colourBy <- "content"
 highlighted <- -1
 
-palette <- list(content = data.frame(colour = c("#1cb01c", "#c67c3b", "#4979e3", "#aeafb0"),
-                                    type = c("positive control", "sample", "negative control", "empty"),
+palette <- list(content = data.frame(colour = c("#79dd79", "#1cb01c", "#0e580e",
+                                                "#c67c3b", "#4979e3", "#aeafb0"),
+                                    type = c("positive control CT26", "positive control CT29", "positive control CT32", 
+                                             "sample", "negative control", "empty"),
                                     stringsAsFactors = FALSE),
                 assigned = data.frame(colour = c("#48b225", "#f58e09", "#d22d2d", "#194689", "#270404"),
                                     type = c("negative", "inconclusive", "positive", "repeat", "failed"),
@@ -112,7 +113,8 @@ getContent <- function(highlighted) {
   } else {
     ses$sendCommand("d3.select('#highlighted').classed('failed', false);")
   }
-  str_c(str_replace_na(c("Highlighted: ", contents$tubeId[highlighted], "<br>",
+  str_c(str_replace_na(c("Highlighted: ", contents$tubeId[highlighted], "<br>", 
+                         contents$content[highlighted], "<br>",
                          "96 well position: ", contents$well96[highlighted], "<br>",
                          "384 well position: ", contents[highlighted, c("A1", "A2", "B1", "B2")] %>% 
                            unlist %>% 
@@ -328,7 +330,7 @@ lc_scatter(dat(opacity = getOpacity(highlighted),
 
 lc_html(dat(content = getContent(highlighted)), place = "highlighted")
 
-ses$sendCommand(str_c("charts.A1.legend.container(d3.select('#info').select('#legend_sample')).legend.sampleHeight(30);",
+ses$sendCommand(str_c("charts.A1.legend.container(d3.select('#info').select('#legend_sample')).legend.sampleHeight(25).legend.width(250);",
                       "charts.A1.showLegend(true).update();"))
 ses$sendCommand(str_c("charts.assigned.legend.container(d3.select('#info').select('#legend_res')).legend.sampleHeight(30);",
                       "charts.assigned.showLegend(true).update();"))
