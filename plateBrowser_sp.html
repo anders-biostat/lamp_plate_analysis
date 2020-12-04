@@ -39,6 +39,26 @@
 		.assign span:hover {
 			opacity: 0.7;
 		}
+		.smokeScreen {
+			position: fixed;
+			padding: 0;
+			margin: 0;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			background: #111;
+			opacity: 0.75;
+			z-index: 10;
+		}
+		.hidden {
+			display: none;
+		}
+		.message {
+			text-align: center;
+			color: #4a1f02;
+			letter-spacing: 1px;
+		}
 	</style>
 	<script type="text/javascript">
 		function addPlates(plates, tmp) {
@@ -47,6 +67,13 @@
 				.append("option")
 					.attr("value", d => d)
 					.text(d => d);
+		}
+		function hideMessage() {
+			d3.select(".modal")
+				.class("hidden", true);
+			d3.select(".smokeScreen")
+				.class("hidden", true);
+
 		}
 	</script>
 </head>
@@ -94,8 +121,14 @@
 				<button onclick="jrc.callFunction('comment', document.getElementById('comment').value);">Add</button>
 			</p>
 			<button onclick="jrc.callFunction('export')">Export</button>
-			<button onclick="jrc.callFunction('reset')">Reset</button>
+			<button onclick="jrc.callFunction('reset')">Reset</button> 
+			<button onclick="jrc.callFunction('post')">Post to the server</button>
+			<p class="message"></p>
 		</div>	
 	</div>
-	<div style="padding-top: 20px; font-size: 80%; font-style: italic;">Made with <a href="anders-biostat.github.io/linked-charts">R/Linked-Charts</a> by S.Ovchinnikova and S.Anders, ZMBH</div>
+	<div style="padding-top: 20px; font-size: 80%; font-style: italic;">
+		Made with <a href="anders-biostat.github.io/linked-charts">R/Linked-Charts</a> by S.Ovchinnikova and S.Anders, ZMBH
+	</div>
+	<div class="smokeScreen hidden" onclick="hideMessage();"></div>
+	<div class="modal hidden"></div>
 </body>

@@ -177,9 +177,14 @@ export <- function() {
                                   result == "inconclusive" ~ "LAMPINC")) %>%
     select(plate, well96, tubeId, result, LAMPStatus, comment) %>%
     write_csv(file.path(dirname(tecan_workbook), file_name))
+  
+  messages[plates] <- str_c("Exported at ", format(Sys.time(), "%H:%M:%S, %d.%m.%Y"))
+  updateMessage(messages[1])
 }
 
-format(Sys.time(), "%y%m%d_%H%M%S_")
+updateMessage <- function(message) {
+  ses$sendCommand(str_c("d3.select('.message').text('", message, "');"))
+}
 
 saveAssignment <- function() {
   contents_all <<- left_join(contents_all, select(contents, assigned, comment, plate, well96), 
@@ -198,6 +203,7 @@ switchPlate <- function(pl) {
     corners <<- filter(corners_all, plate == pl) %>%
       column_to_rownames("corner")
     updateCharts(allCharts)
+    updateMessage(messages[pl])
   }
 }
 
@@ -222,6 +228,8 @@ contents <- filter(contents_all, plate == plates[1])
 tblWide <- filter(tblWide_all, plate == plates[1])
 corners <- filter(corners_all, plate == plates[1]) %>%
   column_to_rownames("corner")
+
+messages <- setNames(rep("", length(plates)), plates)
 
 last <- function() {}
 loop <- create_loop()
