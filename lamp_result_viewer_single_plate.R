@@ -224,7 +224,7 @@ post <- function(username, password) {
     select(tubeId, LAMPStatus, plate, comment) %>%
     rename(barcode = tubeId, status = LAMPStatus, rack = plate) %>%
     rowwise() %>%
-    do(response = POST("http://127.0.0.1:8000/lab/samples/update_status", 
+    do(response = POST("https://covidtest-hd.de/lab/samples/update_status", 
                         auth, encode = "json", body = as.list(.)),
        barcode = .$barcode) -> resps
   
