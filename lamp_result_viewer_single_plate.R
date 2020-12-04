@@ -143,6 +143,7 @@ assign <- function(new_type) {
     updateCharts("assigned", updateOnly = "ElementStyle")
     if(colourBy == "result")
       updateCharts(c("A1", "A2", "B1", "B2"), updateOnly = "ElementStyle")
+    updateMessage("New statuses assigned")
   }
 }
 
@@ -152,7 +153,8 @@ comment <- function(com = NULL) {
     mark(c(), "content")
     mark(c(), "assigned")
     contents[wells, "comment"] <- com
-    contents <<- contents    
+    contents <<- contents
+    updateMessage("Comments added")
   }
 }
 
@@ -178,12 +180,13 @@ export <- function() {
     select(plate, well96, tubeId, result, LAMPStatus, comment) %>%
     write_csv(file.path(dirname(tecan_workbook), file_name))
   
-  messages[plates] <- str_c("Exported at ", format(Sys.time(), "%H:%M:%S, %d.%m.%Y"))
+  messages[plates] <- str_c("Last exported at ", format(Sys.time(), "%H:%M:%S"))
+  messages <<- messages
   updateMessage(messages[1])
 }
 
 updateMessage <- function(message) {
-  ses$sendCommand(str_c("d3.select('.message').text('", message, "');"))
+  ses$sendCommand(str_c("d3.select('#plateMessage').text('", message, "');"))
 }
 
 saveAssignment <- function() {
@@ -207,8 +210,52 @@ switchPlate <- function(pl) {
   }
 }
 
-post <- function() {
+post <- function(username, password) {
+  auth <- authenticate(username, password)
   
+  contents %>%
+    ungroup() %>%
+    filter(content == "sample") %>%
+    mutate(LAMPStatus = case_when(assigned == "positive" ~ "LAMPPOS",
+                                  assigned == "negative" ~ "LAMPNEG",
+                                  assigned == "repeat" ~ "WAIT",
+                                  assigned == "failed" ~ "LAMPFAILED",
+                                  assigned == "inconclusive" ~ "LAMPINC")) %>%
+    select(tubeId, LAMPStatus, plate, comment) %>%
+    rename(barcode = tubeId, status = LAMPStatus, rack = plate) %>%
+    rowwise() %>%
+    do(response = POST("http://127.0.0.1:8000/lab/samples/update_status", 
+                        auth, encode = "json", body = as.list(.)),
+       barcode = .$barcode) -> resps
+  
+    res <- t(sapply(pull(resps, response), function(r) {
+            c(str_extract(http_status(r)$message, "\\d+"), 
+              str_c(capture.output(message(r), type = "message"), collapse = ""))
+    }))
+    res <- cbind(sapply(resps$barcode, `[[`, 1), res)
+    colnames(res) <- c("status", "message", "barcode")
+    
+    if(all(res[, "status"] == "403")){
+      ses$callFunction("wrongPassword")
+    } else {
+      res %>%
+        as_tibble() %>%
+        filter(status != "201") -> errorLog
+      
+      ses$callFunction("reportSuccess", 
+                       list(sum(res[, "status"] == "201"), 
+                            sum(contents$content == "sample"),
+                            errorLog))
+      messages[contents$plate[1]] <- str_c("Last posted at ", format(Sys.time(), "%H:%M:%S"))
+      messages <<- messages
+      updateMessage(messages[contents$plate[1]])
+      
+      if(nrow(errorLog) > 0) {
+        file_name <- str_c(format(Sys.time(), "%y%m%d_%H%M%S_errorLog_"), contents$plate[1], "_"
+                           str_replace(basename(tecan_workbook), "\\.\\w+$", ".csv"))
+        write_csv(errorLog, file.path(dirname(tecan_workbook), file_name))
+      }
+    }
 }
 
 getX <- function(cnr) {

@@ -14,6 +14,7 @@
 		h3 {
 			font-weight: normal;
 			text-align: center;
+			mar
 		}
 		#info #highlighted {
 			font-size: 14pt;
@@ -59,6 +60,31 @@
 			color: #4a1f02;
 			letter-spacing: 1px;
 		}
+		.modal {
+			background: #ddd;
+			position: fixed;
+			top: 50%;
+			left: 50%;
+			width: 600px;
+			height: 300px;
+			margin-left: -300px;
+			margin-top: -150px;
+			z-index: 15;
+		}
+		#login, #report {
+			padding: 20px;
+			padding-top: 0px;
+			margin-left: 50px;
+		}
+
+		#errorLog {
+			width: 100%
+			padding: 10px;
+			margin-bottom: 10px;
+			height: 100px;
+			overflow-y: scroll;
+			border: solid 1px black;
+		}
 	</style>
 	<script type="text/javascript">
 		function addPlates(plates, tmp) {
@@ -67,20 +93,65 @@
 				.append("option")
 					.attr("value", d => d)
 					.text(d => d);
+
+			d3.select("#plateName").text(plates[0]);
 		}
 		function hideMessage() {
+			d3.select("#report")
+				.classed("hidden", true);
+			d3.select("#login")
+				.classed("hidden", false);
 			d3.select(".modal")
-				.class("hidden", true);
+				.classed("hidden", true);
 			d3.select(".smokeScreen")
-				.class("hidden", true);
+				.classed("hidden", true);
+		}
+		function askForCredentials() {
+			d3.select(".smokeScreen")
+				.classed("hidden", false);
+			d3.select(".modal")
+				.classed("hidden", false);
+		};
+		function wrongPassword() {
+			d3.select('#loginMessage').text('Incorrect user name or password.');
+		};
+		function reportSuccess(successNum, totalNum, log) {
+			d3.select('#loginMessage').text('Ready');
 
+			d3.select("#login")
+				.classed("hidden", true);
+			d3.select('#loginMessage').text('');
+
+			d3.select("#successNum")
+				.text(successNum);
+			d3.select("#totalNum")
+				.text(totalNum);
+			d3.select("#report")
+				.classed("hidden", false);
+
+			var errEntrs = d3.select("#errorLog").select("table")
+				.selectAll(".entry").data(log);
+			errEntrs.exit().remove();
+			errEntrs.enter()
+				.append("tr")
+					.attr("class", "entry")
+					.merge(errEntrs)
+						.html(d => '<td>' + d.barcode + '</td><td>' + d.status + '</td><td>' + d.message + '</td>')
+		};
+		function submitPassword() {
+			jrc.callFunction('post', [
+				document.getElementById('username').value, 
+				document.getElementById('psw').value
+			])
+
+			d3.select('#loginMessage').text('Please, wait...');
 		}
 	</script>
 </head>
 <body>
 	<div style="position: absolute;">
 		Select a plate to display:
-		<select id="rackIds" onchange="jrc.callFunction('switchPlate', this.value);" style="width: 100px;"></select>
+		<select id="rackIds" onchange="jrc.callFunction('switchPlate', this.value); d3.select('#plateName').text(this.value);" style="width: 100px;"></select>
 	</div>
 	<h2 style="text-align: center;">LAMP results viewer</h2>
 	<h3>Opened file:</h3>
@@ -115,20 +186,48 @@
 				<span style="background: #48b225;" onclick="jrc.callFunction('assign', 'negative');" title="negative">n</span>
 				<span style="background: #194689;" onclick="jrc.callFunction('assign', 'repeat');" title="repeat">r</span>
 				<span style="background: #270404;" onclick="jrc.callFunction('assign', 'failed');" title="failed">f</span>
+				<button onclick="jrc.callFunction('reset')">Reset plate</button> 
 			</p>
 			<p>
 				add comment: <input type="text" name="comment" id="comment">
 				<button onclick="jrc.callFunction('comment', document.getElementById('comment').value);">Add</button>
 			</p>
-			<button onclick="jrc.callFunction('export')">Export</button>
-			<button onclick="jrc.callFunction('reset')">Reset</button> 
-			<button onclick="jrc.callFunction('post')">Post to the server</button>
-			<p class="message"></p>
+			<button onclick="jrc.callFunction('export')">Export all plates to file</button>
+			<button onclick="askForCredentials();">Post this plate to the server</button>
+			<p class="message" id="plateMessage"></p>
 		</div>	
 	</div>
 	<div style="padding-top: 20px; font-size: 80%; font-style: italic;">
 		Made with <a href="anders-biostat.github.io/linked-charts">R/Linked-Charts</a> by S.Ovchinnikova and S.Anders, ZMBH
 	</div>
 	<div class="smokeScreen hidden" onclick="hideMessage();"></div>
-	<div class="modal hidden"></div>
+	<div class="modal hidden">
+		<h3>Post plate <span id="plateName"></span></h3>
+		<div id="login">
+			<p>Username: <input type="text" id="username"></p>
+			<p>Password: <input type="password" id="psw"></p>
+			<p>
+				<button onclick="hideMessage();">Close</button>
+				<button onclick="submitPassword();">Submit</button>
+			</p>
+			<p id="loginMessage" class="message"></p>
+		</div>
+		<div id="report" class="hidden">
+			<p>
+				New statuses for <span id="successNum" style="color: #247b0f; font-weight: bold;"></span> 
+				out of <span id="totalNum" style="font-weight: bold;"></span> samples uploaded.
+			</p>
+			<p>Error log (stored automatically):</p>
+			<div id="errorLog">
+				<table>
+					<tr>
+						<th>Barcode</th>
+						<th>Status</th>
+						<th>Server response</th>
+					</tr>
+				</table>
+			</div>
+			<button onclick="hideMessage()">Close</button>
+		</div>
+	</div>
 </body>
