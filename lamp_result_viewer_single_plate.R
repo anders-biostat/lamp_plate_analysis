@@ -1,4 +1,5 @@
 library( later )
+library(httr)
 library( tidyverse )
 
 controls <- c("ACTB", "Actin", "Zika")
@@ -200,6 +201,10 @@ switchPlate <- function(pl) {
   }
 }
 
+post <- function() {
+  
+}
+
 getX <- function(cnr) {
   parse(text = str_c("as.numeric(filter(tblWide, corner == '", cnr, "') %>% pull(minutes))"))
 }
@@ -222,10 +227,11 @@ last <- function() {}
 loop <- create_loop()
 
 app <- openPage( FALSE, startPage = "plateBrowser_sp.html", 
-                 allowedFunctions = c("assign", "comment", "export", "reset", "switchPlate"))
+                 allowedFunctions = c("assign", "comment", "export", "reset", "switchPlate",
+                                      "post"))
 ses <- app$getSession()
 
-ses$callFunction("addPlates", list(plates, 1))
+ses$callFunction("addPlates", list(plates, 1), keepAsVector = TRUE)
 
 allCharts <- c("A1", "A2", "B1", "B2", "assigned", "content")
 
