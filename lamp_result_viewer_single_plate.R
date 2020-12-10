@@ -1,5 +1,5 @@
 library( later )
-library(httr)
+library( httr )
 library( tidyverse )
 
 controls <- c("ACTB", "Actin", "Zika")
@@ -251,7 +251,7 @@ post <- function(username, password) {
       updateMessage(messages[contents$plate[1]])
       
       if(nrow(errorLog) > 0) {
-        file_name <- str_c(format(Sys.time(), "%y%m%d_%H%M%S_errorLog_"), contents$plate[1], "_"
+        file_name <- str_c(format(Sys.time(), "%y%m%d_%H%M%S_errorLog_"), contents$plate[1], "_",
                            str_replace(basename(tecan_workbook), "\\.\\w+$", ".csv"))
         write_csv(errorLog, file.path(dirname(tecan_workbook), file_name))
       }
