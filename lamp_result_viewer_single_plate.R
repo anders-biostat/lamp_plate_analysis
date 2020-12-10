@@ -39,7 +39,7 @@ read_excel( tecan_workbook, "PrimerSetsUsed" ) %>%
           "tubeId" = "Tube ID",
           "comment" = "Comment") %>%
   select(-fullpath) %>%
-  muate(comment = ifelse(is.na(comment), "", comment)) %>%
+  mutate(comment = ifelse(is.na(comment), "", comment)) %>%
   mutate_at( "well96", str_replace, "0(\\d+)", "\\1" ) -> contents_all
 
 if(length(setdiff(corners_all$plate, contents_all$plate)) > 0)
@@ -225,6 +225,8 @@ switchPlate <- function(pl) {
 post <- function(username, password) {
   auth <- authenticate(username, password)
   
+  posted <- tibble()
+  
   contents %>%
     ungroup() %>%
     filter(content == "sample") %>%
@@ -234,9 +236,10 @@ post <- function(username, password) {
                                   assigned == "failed" ~ "LAMPFAILED",
                                   assigned == "inconclusive" ~ "LAMPINC")) %>%
     select(tubeId, LAMPStatus, plate, comment) %>%
-    rename(barcode = tubeId, status = LAMPStatus, rack = plate) %>%
+    rename(barcode = tubeId, status = LAMPStatus, rack = plate) %T>%
+    {posted <<- .} %>%
     rowwise() %>%
-    do(response = POST("https://covidtest-hd.de/lab/samples/update_status", 
+    do(response = POST("http://127.0.0.1:8000/lab/samples/update_status", 
                         auth, encode = "json", body = as.list(.)),
        barcode = .$barcode) -> resps
   
@@ -245,7 +248,7 @@ post <- function(username, password) {
               str_c(capture.output(message(r), type = "message"), collapse = ""))
     }))
     res <- cbind(sapply(resps$barcode, `[[`, 1), res)
-    colnames(res) <- c("status", "message", "barcode")
+    colnames(res) <- c( "barcode", "status", "message")
     
     if(all(res[, "status"] == "403")){
       ses$callFunction("wrongPassword")
@@ -262,11 +265,14 @@ post <- function(username, password) {
       messages <<- messages
       updateMessage(messages[contents$plate[1]])
       
-      if(nrow(errorLog) > 0) {
-        file_name <- str_c(format(Sys.time(), "%y%m%d_%H%M%S_errorLog_"), contents$plate[1], "_",
-                           str_replace(basename(tecan_workbook), "\\.\\w+$", ".csv"))
-        write_csv(errorLog, file.path(dirname(tecan_workbook), file_name))
-      }
+      file_name <- str_c(format(Sys.time(), "%y%m%d_%H%M%S_postLog_"), contents$plate[1], "_",
+                         str_replace(basename(tecan_workbook), "\\.\\w+$", ".csv"))
+      
+      res %>%
+        as_tibble() %>%
+        rename(response_status = status) %>%
+        left_join(rename(posted, new_status = status)) %>%
+        write_csv(file.path(dirname(dirname(tecan_workbook)), contents$plate[1], file_name))
     }
 }
 
