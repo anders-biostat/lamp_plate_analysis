@@ -1,6 +1,8 @@
+library( readxl )
 library( later )
 library( httr )
 library( tidyverse )
+library( rlc )
 
 controls <- c("ACTB", "Actin", "Zika")
 
@@ -10,32 +12,44 @@ if(!file.exists(tecan_workbook))
 
 read_tecan_sheet <- function( filename, sheet ) {
   inner_join( by="well",
-    readxl::read_excel( filename, sheet, skip=24, n_max=384 ) %>%
+    read_excel( filename, sheet, skip=24, n_max=384 ) %>%
       assertr::verify( identical( colnames(.), c( "<>", "Value" ) ) ) %>%
       rename( "well" = "<>", "od434" = "Value" ),
-    readxl::read_excel( filename, sheet, skip=425, n_max=384 ) %>%
+    read_excel( filename, sheet, skip=425, n_max=384 ) %>%
       assertr::verify( identical( colnames(.), c( "<>", "Value" ) ) ) %>%
       rename( "well" = "<>", "od560" = "Value" ) )
 }
 
-readxl::read_excel( tecan_workbook, "PrimerSetsUsed" ) %>%
-  rename( "plate"="Plate-ID", "corner" = "A1 position of 96-well in 384-well" ) -> corners_all
-
-readxl::read_excel( tecan_workbook, "Barcodes_SampleTypes" )  %>%
+read_excel( tecan_workbook, "PrimerSetsUsed" ) %>%
+  rename( "plate"="Plate-ID", "corner" = "A1 position of 96-well in 384-well" ) %T>%
+  {corners_all <<- .} %>%
+  select(plate) %>%
+  distinct() %>%
+  mutate(filename = str_c(plate, "_barcodes.xlsx"), 
+         dirname = file.path(dirname(dirname(tecan_workbook)), plate)) %>%
+  mutate(fullpath = file.path(dirname, filename)) %>%
+  group_by(fullpath) %>%
+  summarise(barcodes = list(read_excel(fullpath, 
+                                       range = cell_cols("A:E"))),
+            .groups = "drop") %>%
+  unnest(barcodes) %>%
   rename( "well96" = "Tube Position", 
           "plate" = "Rack ID", 
           "content" = "Type",
-          "tubeId" = "Tube ID") %>%
+          "tubeId" = "Tube ID",
+          "comment" = "Comment") %>%
+  select(-fullpath) %>%
+  muate(comment = ifelse(is.na(comment), "", comment)) %>%
   mutate_at( "well96", str_replace, "0(\\d+)", "\\1" ) -> contents_all
 
 if(length(setdiff(corners_all$plate, contents_all$plate)) > 0)
-  stop(str_interp("Content information is missing for the following plates: ${setdiff(corners$plate, contents$plate)}"))
+  stop(str_interp("Content information is missing for the following plates: ${setdiff(corners_all$plate, contents_all$plate)}"))
 
-readxl::excel_sheets( tecan_workbook ) %>%
+excel_sheets( tecan_workbook ) %>%
   { tibble( sheet = . ) } %>%
   filter(!(sheet %in% c("PrimerSetsUsed", "Barcodes_SampleTypes"))) %>%
   group_by_all() %>%
-  summarise(header = readxl::read_excel(tecan_workbook, sheet, "E14:E15", col_names = FALSE)[["...1"]]) %>%
+  summarise(header = read_excel(tecan_workbook, sheet, "E14:E15", col_names = FALSE)[["...1"]]) %>%
   mutate(type = c("plate", "minutes")) %>%
   pivot_wider(names_from = type, values_from = header) %>%
   mutate( minutes = str_match( minutes, "(\\d+)\\w*((min)?)" ) %>% `[`(,2) ) %>%
@@ -76,10 +90,8 @@ tblWide_all %>%
                    positiveTest == 0 ~ "negative",
                    TRUE ~ "inconclusive")) %>%
   select(-(positiveTest:totalControl)) %>%
-  mutate(comment = "", assigned = result) %>%
+  mutate(assigned = result) %>%
   right_join(contents_all) -> contents_all
-
-library( rlc )
 
 colourBy <- "content"
 highlighted <- -1
