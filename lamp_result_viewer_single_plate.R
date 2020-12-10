@@ -35,7 +35,7 @@ readxl::excel_sheets( tecan_workbook ) %>%
   { tibble( sheet = . ) } %>%
   filter(!(sheet %in% c("PrimerSetsUsed", "Barcodes_SampleTypes"))) %>%
   group_by_all() %>%
-  summarise(header = readxl::read_excel(tecan_workbook, sheet, skip = 12, col_names = FALSE)[["...5"]][1:2]) %>%
+  summarise(header = readxl::read_excel(tecan_workbook, sheet, "E14:E15", col_names = FALSE)[["...1"]]) %>%
   mutate(type = c("plate", "minutes")) %>%
   pivot_wider(names_from = type, values_from = header) %>%
   mutate( minutes = str_match( minutes, "(\\d+)\\w*((min)?)" ) %>% `[`(,2) ) %>%
@@ -289,6 +289,20 @@ ses <- app$getSession()
 ses$callFunction("addPlates", list(plates, 1), keepAsVector = TRUE)
 
 allCharts <- c("A1", "A2", "B1", "B2", "assigned", "content")
+
+# let's check that each well-plate combination is unique
+contents_all %>%
+  group_by(well96, plate) %>%
+  tally() %>%
+  filter(n > 1) -> dupls
+
+if(nrow(dupls) > 0) {
+  ses$sendData("duplicates", dupls)
+  ses$callFunction("alertDuplicates", keepAsVector = TRUE)
+  while(length(app$getSessionIds()) > 0)
+    httpuv::service()
+  stop("Duplicated wells detected.")
+}
 
 for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
   lc_line(

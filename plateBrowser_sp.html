@@ -95,7 +95,8 @@
 					.text(d => d);
 
 			d3.select("#plateName").text(plates[0]);
-		}
+		};
+
 		function hideMessage() {
 			d3.select("#report")
 				.classed("hidden", true);
@@ -105,16 +106,19 @@
 				.classed("hidden", true);
 			d3.select(".smokeScreen")
 				.classed("hidden", true);
-		}
+		};
+
 		function askForCredentials() {
 			d3.select(".smokeScreen")
 				.classed("hidden", false);
 			d3.select(".modal")
 				.classed("hidden", false);
 		};
+
 		function wrongPassword() {
 			d3.select('#loginMessage').text('Incorrect user name or password.');
 		};
+
 		function reportSuccess(successNum, totalNum, log) {
 			d3.select('#loginMessage').text('Ready');
 
@@ -138,6 +142,7 @@
 					.merge(errEntrs)
 						.html(d => '<td>' + d.barcode + '</td><td>' + d.status + '</td><td>' + d.message + '</td>')
 		};
+
 		function submitPassword() {
 			jrc.callFunction('post', [
 				document.getElementById('username').value, 
@@ -145,7 +150,16 @@
 			])
 
 			d3.select('#loginMessage').text('Please, wait...');
-		}
+		};
+
+		function alertDuplicates() {
+			if(!Array.isArray(duplicates))
+				duplicates = [duplicates];
+			alert("Duplicated wells detected\n" + 
+				duplicates.map(el => "rack: " + el.plate + ", well: " + el.well96)
+					.join("; "));
+			window.close();
+		};
 	</script>
 </head>
 <body>
