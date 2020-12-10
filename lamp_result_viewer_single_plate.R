@@ -148,8 +148,6 @@ clearHighlighted <- function() {
 assign <- function(new_type) {
   wells <- unique(c(getMarked("content"), getMarked("assigned")))
   if(length(wells) > 0){
-    mark(c(), "content")
-    mark(c(), "assigned")
     contents[wells, "assigned"] <- new_type
     contents <<- contents
     updateCharts("assigned", updateOnly = "ElementStyle")
