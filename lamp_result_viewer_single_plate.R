@@ -237,7 +237,7 @@ post <- function(username, password) {
     rename(barcode = tubeId, status = LAMPStatus, rack = plate) %T>%
     {posted <<- .} %>%
     rowwise() %>%
-    do(response = POST("http://127.0.0.1:8000/lab/samples/update_status", 
+    do(response = POST("https://covidtest-hd.de/lab/samples/update_status", 
                         auth, encode = "json", body = as.list(.)),
        barcode = .$barcode) -> resps
   
