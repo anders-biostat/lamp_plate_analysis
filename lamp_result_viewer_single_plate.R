@@ -321,6 +321,9 @@ if(nrow(dupls) > 0) {
 }
 
 for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
+  lc_vLine(v = 25, dasharray = 5, transitionDuration = 0, colour = "#777", place = cnr)
+  lc_hLine(h = 0.1, dasharray = 5, transitionDuration = 0, colour = "#777", chartId = cnr, addLayer = TRUE)
+  
   lc_line(
     dat(opacity = getOpacity(highlighted),
         lineWidth = ifelse(1:nrow(contents) == highlighted, 3, 1),
@@ -345,7 +348,7 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
       highlighted <<- -1
       last <<- later(clearHighlighted, 0.4, loop)
     },
-    place = cnr)
+    chartId = cnr, addLayer = TRUE)
 }
 
 lc_scatter(dat(opacity = getOpacity(highlighted), 
