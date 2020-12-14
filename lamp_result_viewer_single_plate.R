@@ -73,23 +73,26 @@ excel_sheets( tecan_workbook ) %>%
 
 tblWide_all %>%
   pivot_longer(names_to = "well96", values_to = "diff", -(sheet:corner)) %>%
-  group_by(well96, corner, plate) %>%
-  mutate(baseline = mean(diff[minutes <= 10])) %>%
-  mutate(increase = diff - baseline) %>%
-  filter(minutes == 25) %>%
   left_join(corners_all) %>%
-  mutate(result = ifelse(increase > 0.4, "positive", "negative"),
-         isControl = PrimerSet %in% controls) %>% 
+  mutate(isControl = PrimerSet %in% controls) %>%
+  filter((minutes <= 25 & !isControl) | (minutes <= 20 & isControl))  %>%
+  group_by(plate, corner, well96, isControl) %>%
+  summarise(baseline = mean(diff[minutes <= 10]),
+            maxDiff = max(diff), .groups = "drop") %>%
+  mutate(result = ifelse(maxDiff >= 0.1, "positive", "negative")) %>%
   group_by(well96, plate) %>% 
   summarise(positiveTest = sum(result == "positive" & !isControl),
             positiveControl = sum(result == "positive" & isControl),
             totalTest = sum(!isControl),
-            totalControl = sum(isControl)) %>%
-  mutate(result = case_when(positiveTest == totalTest ~ "positive",
-                   positiveControl < totalControl ~ "repeat",
-                   positiveTest == 0 ~ "negative",
-                   TRUE ~ "inconclusive")) %>%
-  select(-(positiveTest:totalControl)) %>%
+            totalControl = sum(isControl),
+            lowBaseline = sum(baseline <= -0.1)) %>%
+  mutate(result = case_when(
+    lowBaseline < totalTest + totalControl ~ "repeat",
+    positiveTest == totalTest ~ "positive",
+    positiveControl < totalControl ~ "repeat",
+    positiveTest == 0 ~ "negative",
+    TRUE ~ "inconclusive")) %>%
+  select(-(positiveTest:lowBaseline)) %>%
   mutate(assigned = result) %>%
   right_join(contents_all) -> contents_all
 
@@ -321,7 +324,8 @@ if(nrow(dupls) > 0) {
 }
 
 for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
-  lc_vLine(v = 25, dasharray = 5, transitionDuration = 0, colour = "#777", place = cnr)
+  lc_vLine(v = ifelse(corners[cnr, "PrimerSet"] %in% controls, 20, 25), 
+           dasharray = 5, transitionDuration = 0, colour = "#777", place = cnr)
   lc_hLine(h = 0.1, dasharray = 5, transitionDuration = 0, colour = "#777", chartId = cnr, addLayer = TRUE)
   
   lc_line(
