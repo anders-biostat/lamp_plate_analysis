@@ -187,7 +187,7 @@ export <- function() {
     rename(result = assigned) %>%
     mutate(LAMPStatus = case_when(result == "positive" ~ "LAMPPOS",
                                   result == "negative" ~ "LAMPNEG",
-                                  result == "repeat" ~ "WAIT",
+                                  result == "repeat" ~ "LAMPREPEAT",
                                   result == "failed" ~ "LAMPFAILED",
                                   result == "inconclusive" ~ "LAMPINC")) %>%
     select(plate, well96, tubeId, result, LAMPStatus, comment) %>%
@@ -233,7 +233,7 @@ post <- function(username, password) {
     filter(content == "sample") %>%
     mutate(LAMPStatus = case_when(assigned == "positive" ~ "LAMPPOS",
                                   assigned == "negative" ~ "LAMPNEG",
-                                  assigned == "repeat" ~ "WAIT",
+                                  assigned == "repeat" ~ "LAMPREPEAT",
                                   assigned == "failed" ~ "LAMPFAILED",
                                   assigned == "inconclusive" ~ "LAMPINC")) %>%
     select(tubeId, LAMPStatus, plate, comment) %>%
