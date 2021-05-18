@@ -387,10 +387,10 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
   
   lc_line(
     dat(opacity = getOpacity(highlighted),
-        lineWidth = ifelse(1:nrow(contents) == highlighted, 3, 1),
+        lineWidth = ifelse(1:nrow(layout) == highlighted, 3, 1),
         palette = palette[[colourBy]][["colour"]],
         colourDomain = palette[[colourBy]][["type"]],
-        colourValue = contents[[colourBy]]),
+        colourValue = layout[[colourBy]]),
     x = getX(cnr),
     y = getY(cnr),
     title = getTitle(cnr),
