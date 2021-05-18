@@ -7,7 +7,7 @@ library( rlc )
 
 controls <- c("ACTB", "Actin", "Zika")
 results_order <- rev(1:5)
-names(results_order) <- c("positive", "inconclusive", "negative", "repeat", "fail")
+names(results_order) <- c("positive", "inconclusive", "negative", "repeat", "failed")
 
 tecan_workbook <- commandArgs(TRUE)[1]
 if(!file.exists(tecan_workbook))
@@ -128,11 +128,11 @@ palette <- list(content = data.frame(colour = c("#79dd79", "#1cb01c", "#0e580e",
 
 getOpacity <- function(highlighted) {
   if(highlighted == -1) {
-    op <- rep(1, nrow(contents))
-    op[contents$content == "empty"] <- 0.05
+    op <- rep(1, nrow(layout))
+    op[layout$content == "empty"] <- 0.05
   } else {
-    op <- rep(0.2, nrow(contents))
-    op[contents$content == "empty"] <- 0.05
+    op <- rep(0.2, nrow(layout))
+    op[layout$content == "empty"] <- 0.05
     op[highlighted] <- 1
   }
   op
@@ -173,10 +173,11 @@ clearHighlighted <- function() {
 }
 
 assign <- function(new_type) {
-  wells <- unique(c(getMarked("content"), getMarked("assigned")))
+  wells <- layout$well96[unique(c(getMarked("content"), getMarked("assigned")))]
   if(length(wells) > 0){
-    contents[wells, "assigned"] <- new_type
-    contents <<- contents
+    contents <<- mutate(contents, assigned = ifelse(well96 %in% wells, 
+                                                    new_type, assigned))
+    layout <<- getLayout(contents)
     updateCharts("assigned", updateOnly = "ElementStyle")
     if(colourBy == "result")
       updateCharts(c("A1", "A2", "B1", "B2"), updateOnly = "ElementStyle")
@@ -185,12 +186,13 @@ assign <- function(new_type) {
 }
 
 comment <- function(com = NULL) {
-  wells <- unique(c(getMarked("content"), getMarked("assigned")))
+  wells <- layout$well96[unique(c(getMarked("content"), getMarked("assigned")))]
   if(length(wells) > 0 & !is.null(com)){
     mark(c(), "content")
     mark(c(), "assigned")
-    contents[wells, "comment"] <- com
-    contents <<- contents
+    contents <<- mutate(contents, comment = ifelse(well96 %in% wells, 
+                                                    com, comment))
+    layout <<- getLayout(contents)
     updateMessage("Comments added")
   }
 }
@@ -198,6 +200,7 @@ comment <- function(com = NULL) {
 reset <- function() {
   contents$assigned <- contents$result
   contents <<- contents
+  layout <<- getLayout(contents)
   updateCharts(allCharts, updateOnly="ElementStyle")
 }
 
@@ -261,8 +264,8 @@ post <- function(username, password) {
                                   assigned == "repeat" ~ "LAMPREPEAT",
                                   assigned == "failed" ~ "LAMPFAILED",
                                   assigned == "inconclusive" ~ "LAMPINC")) %>%
-    select(tubeId, LAMPStatus, plate, comment) %>%
-    rename(barcode = tubeId, status = LAMPStatus, rack = plate) %T>%
+    select(tubeId, LAMPStatus, rack, comment) %>%
+    rename(barcode = tubeId, status = LAMPStatus) %T>%
     {posted <<- .} %>%
     rowwise() %>%
     do(response = POST("https://covidtest-hd.de/lab/samples/update_status", 
