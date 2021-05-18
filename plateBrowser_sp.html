@@ -87,12 +87,16 @@
 		}
 	</style>
 	<script type="text/javascript">
-		function addPlates(plates, tmp) {
-			d3.select("#rackIds").selectAll("option").data(plates)
-				.enter()
-				.append("option")
-					.attr("value", d => d)
-					.text(d => d);
+		function addPlates(opts, plates) {
+			d3.select("#rackIds").selectAll("option")
+				.data(d3.range(opts.length).map(i => ({
+					text: opts[i],
+					plate: plates[i]
+				})))
+					.enter()
+					.append("option")
+						.attr("value", d => d.plate)
+						.text(d => d.text);
 
 			d3.select("#plateName").text(plates[0]);
 		};
@@ -165,7 +169,7 @@
 <body>
 	<div style="position: absolute;">
 		Select a plate to display:
-		<select id="rackIds" onchange="jrc.callFunction('switchPlate', this.value); d3.select('#plateName').text(this.value);" style="width: 100px;"></select>
+		<select id="rackIds" onchange="jrc.callFunction('switchPlate', this.value); d3.select('#plateName').text(this.value);" style="width: 300px;"></select>
 	</div>
 	<h2 style="text-align: center;">LAMP results viewer</h2>
 	<h3>Opened file:</h3>

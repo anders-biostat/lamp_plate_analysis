@@ -325,7 +325,16 @@ app <- openPage( FALSE, startPage = "plateBrowser_sp.html",
                                       "post"))
 ses <- app$getSession()
 
-ses$callFunction("addPlates", list(plates, 1), keepAsVector = TRUE)
+opts <- plates
+if(rack_to_plate$rack[1] != "__empty__")
+  rack_to_plate %>%
+    group_by(plate) %>%
+    summarise(racks = paste(rack, collapse = ", ")) %>%
+    unite("option", plate, racks, sep = ", racks: ") %>%
+    pull(option) -> opts
+    
+
+ses$callFunction("addPlates", list(opts, plates), keepAsVector = TRUE)
 
 allCharts <- c("A1", "A2", "B1", "B2", "assigned", "content")
 
