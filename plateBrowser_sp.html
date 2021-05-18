@@ -156,12 +156,23 @@
 			d3.select('#loginMessage').text('Please, wait...');
 		};
 
-		function alertDuplicates() {
-			if(!Array.isArray(duplicates))
-				duplicates = [duplicates];
-			alert("Duplicated wells detected\n" + 
-				duplicates.map(el => "rack: " + el.plate + ", well: " + el.well96)
-					.join("; "));
+		function alertContentProblem(type) {
+			if(!Array.isArray(spurious))
+				spurious = [spurious];
+			var message = "";
+
+			if(type == "duplicates"){
+				message = "Duplicated wells detected\n" + 
+					spurious.map(el => "rack: " + el.rack + ", well: " + el.well96)
+						.join("; ");
+			} else if(type == "mixed_content") {
+				message = "Pooled wells with mixed content detected\n" + 
+					spurious.map(el => "plate: " + el.plate + ", well: " + el.well96)
+						.join("; ");
+			} else {
+				message = "Unknown content problem: " + type;
+			}
+			alert(message);
 			window.close();
 		};
 	</script>

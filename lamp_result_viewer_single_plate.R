@@ -305,7 +305,8 @@ getLayout <- function(contents) {
   contents %>%
     group_by(plate, col96, row96Letter) %>%
     summarise(same_result = length(unique(assigned)) == 1,
-              assigned = assigned[which.max(results_order[assigned])])
+              assigned = assigned[which.max(results_order[assigned])],
+              content = content[1])
 }
 
 plates <- unique(corners_all$plate)
@@ -342,15 +343,29 @@ allCharts <- c("A1", "A2", "B1", "B2", "assigned", "content")
 contents_all %>%
   group_by(well96, rack) %>%
   tally() %>%
-  filter(n > 1) -> dupls
-
-if(nrow(dupls) > 0) {
-  ses$sendData("duplicates", dupls)
-  ses$callFunction("alertDuplicates", keepAsVector = TRUE)
+  filter(n > 1) -> spurious
+if(nrow(spurious) > 0) {
+  ses$sendData("spurious", spurious)
+  ses$callFunction("alertContentProblem", list("duplicates"))
   while(length(app$getSessionIds()) > 0)
     httpuv::service()
   stop("Duplicated wells detected.")
 }
+
+# let's also check that content of the pooled wells is the same
+# TO DO: Ask if one can theoretically pool empty well and sample
+contents_all %>%
+  group_by(rack, well96) %>%
+  summarise(n = length(unique(content))) %>%
+  filter(n > 1) -> spurious
+if(nrow(spurious) > 0) {
+  ses$sendData("spurious", spurious)
+  ses$callFunction("alertContentProblem", list("mixed_content"))
+  while(length(app$getSessionIds()) > 0)
+    httpuv::service()
+  stop("Pooled wells with mixed content detected.")
+}
+
 
 for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
   lc_vLine(v = ifelse(corners[cnr, "PrimerSet"] %in% controls, 20, 25), 
