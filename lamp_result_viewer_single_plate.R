@@ -1,3 +1,4 @@
+library(hwriter)
 library( readxl )
 library( later )
 library( httr )
@@ -11,6 +12,10 @@ names(results_order) <- c("positive", "inconclusive", "negative", "repeat", "fai
 tecan_workbook <- commandArgs(TRUE)[1]
 if(!file.exists(tecan_workbook))
   stop(str_c("File not found: ", tecan_workbook))
+rack_to_plate_path <- file.path(dirname(tecan_workbook), 
+                                "Files from Hamilton",
+                                "1500InputOutputMapping.csv")
+
 rack_to_plate = tibble(rack = "__empty__", plate = "__empty__")
 
 if(file.exists(rack_to_plate_path)) {
@@ -97,7 +102,8 @@ tblWide_all %>%
             positiveControl = sum(result == "positive" & isControl),
             totalTest = sum(!isControl),
             totalControl = sum(isControl),
-            lowBaseline = sum(baseline <= -0.1)) %>%
+            lowBaseline = sum(baseline <= -0.1),
+            .groups = "drop") %>%
   mutate(result = case_when(
     lowBaseline < totalTest + totalControl ~ "repeat",
     positiveTest == totalTest ~ "positive",
@@ -134,23 +140,29 @@ getOpacity <- function(highlighted) {
 getContent <- function(highlighted) {
   if(highlighted == -1) {
     ses$sendCommand("d3.select('#highlighted').classed('failed', false);")
-    return("No highlighted lines")
+    return("No highlighted samples")
   }
-  if(contents$result[highlighted] == "failed") {
+  if(layout$assigned[highlighted] == "failed") {
     ses$sendCommand("d3.select('#highlighted').classed('failed', true);")
   } else {
     ses$sendCommand("d3.select('#highlighted').classed('failed', false);")
   }
-  str_c(str_replace_na(c("Highlighted: ", contents$tubeId[highlighted], "<br>", 
-                         contents$content[highlighted], "<br>",
-                         "96 well position: ", contents$well96[highlighted], "<br>",
-                         "384 well position: ", contents[highlighted, c("A1", "A2", "B1", "B2")] %>% 
-                           unlist %>% 
-                           str_c(collapse = ", "), "<br><i>",
-                         contents$comment[highlighted], "</i>")), 
-        collapse = "")
   
+  filter(contents, well96  == layout$well96[highlighted]) %>%
+    mutate(rack = str_c("<b>", rack, "</b>")) -> highlighted_data
+  select(highlighted_data, rack, tubeId, assigned, comment) %>%
+    unlist() %>%
+    matrix(nrow = 4, byrow = TRUE) %>%
+    hwrite(border = 0, width = "100%", 
+           style = "margin-top: 0; text-align: center; padding-top: 0;") -> table
+  
+  str_c(c(highlighted_data$well96[1], " -> ", highlighted_data[1, c("A1", "A2", "B1", "B2")] %>% 
+                           unlist %>% 
+                           str_c(collapse = ", "), ";<br>",
+                         "<center>", highlighted_data$content[1], "</center>",
+                         table), collapse = "")
 }
+
 clearHighlighted <- function() {
   if(highlighted == -1){
     updateCharts(chartId = c("A1", "A2", "B1", "B2", "content", "assigned"), 
@@ -293,7 +305,7 @@ getX <- function(cnr) {
   parse(text = str_c("as.numeric(filter(tblWide, corner == '", cnr, "') %>% pull(minutes))"))
 }
 getY <- function(cnr) {
-  parse(text = str_c("(filter(tblWide, corner == '", cnr, "') %>% select(-(sheet:corner)) %>% as.matrix())[, contents$well96]"))
+  parse(text = str_c("(filter(tblWide, corner == '", cnr, "') %>% select(-(sheet:corner)) %>% as.matrix())[, layout$well96]"))
 }
 
 getTitle <- function(cnr) {
@@ -303,7 +315,7 @@ getTitle <- function(cnr) {
 
 getLayout <- function(contents) {
   contents %>%
-    group_by(plate, col96, row96Letter) %>%
+    group_by(well96, col96, row96Letter) %>%
     summarise(same_result = length(unique(assigned)) == 1,
               assigned = assigned[which.max(results_order[assigned])],
               content = content[1])
@@ -355,7 +367,7 @@ if(nrow(spurious) > 0) {
 # let's also check that content of the pooled wells is the same
 # TO DO: Ask if one can theoretically pool empty well and sample
 contents_all %>%
-  group_by(rack, well96) %>%
+  group_by(plate, well96) %>%
   summarise(n = length(unique(content))) %>%
   filter(n > 1) -> spurious
 if(nrow(spurious) > 0) {
