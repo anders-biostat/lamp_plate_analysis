@@ -172,10 +172,10 @@ clearHighlighted <- function() {
   }
 }
 
-assign <- function(new_type) {
+assign <- function(new_type, racks) {
   wells <- layout$well96[unique(c(getMarked("content"), getMarked("assigned")))]
   if(length(wells) > 0){
-    contents <<- mutate(contents, assigned = ifelse(well96 %in% wells, 
+    contents <<- mutate(contents, assigned = ifelse(well96 %in% wells & rack %in% racks, 
                                                     new_type, assigned))
     layout <<- getLayout(contents)
     updateCharts("assigned", updateOnly = "ElementStyle")
@@ -185,12 +185,12 @@ assign <- function(new_type) {
   }
 }
 
-comment <- function(com = NULL) {
+comment <- function(com = NULL , racks) {
   wells <- layout$well96[unique(c(getMarked("content"), getMarked("assigned")))]
   if(length(wells) > 0 & !is.null(com)){
     mark(c(), "content")
     mark(c(), "assigned")
-    contents <<- mutate(contents, comment = ifelse(well96 %in% wells, 
+    contents <<- mutate(contents, comment = ifelse(well96 %in% wells & rack %in% racks, 
                                                     com, comment))
     layout <<- getLayout(contents)
     updateMessage("Comments added")
@@ -246,6 +246,7 @@ switchPlate <- function(pl) {
     tblWide <<- filter(tblWide_all, plate == pl)
     corners <<- filter(corners_all, plate == pl) %>%
       column_to_rownames("corner")
+    ses$callFunction("setCheckboxes", list(unique(contents$rack)), keepAsVector = TRUE)
     updateCharts(allCharts)
     updateMessage(messages[pl])
   }
@@ -493,6 +494,7 @@ lc_scatter(dat(opacity = getOpacity(highlighted),
 
 lc_html(dat(content = getContent(highlighted)), place = "highlighted")
 
+ses$callFunction("setCheckboxes", list(unique(contents$rack)), keepAsVector = TRUE)
 ses$sendCommand(str_c("charts.A1.legend.container(d3.select('#info').select('#legend_sample')).legend.sampleHeight(25).legend.width(250);",
                       "charts.A1.showLegend(true).update();"))
 ses$sendCommand(str_c("charts.assigned.legend.container(d3.select('#info').select('#legend_res')).legend.sampleHeight(30);",
@@ -501,6 +503,7 @@ ses$sendCommand('d3.selectAll("#legend_res").selectAll("text").attr("font-size",
 ses$sendCommand('d3.selectAll("#legend_sample").selectAll("text").attr("font-size", 17).attr("dy", 7)')
 fileName <- basename(tecan_workbook)
 ses$sendCommand(str_interp('d3.select("h3").html("File: <i>${fileName}</i>")'))
+ses$sendCommand('d3.select("#plates").append("p").text("Hold the \'Shift\' key and select wells from one the layouts");')
 
 while(length(app$getSessionIds()) > 0)
   httpuv::service()

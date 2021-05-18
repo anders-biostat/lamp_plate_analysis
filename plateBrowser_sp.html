@@ -14,7 +14,6 @@
 		h3 {
 			font-weight: normal;
 			text-align: center;
-			mar
 		}
 		#info #highlighted {
 			font-size: 14pt;
@@ -28,7 +27,7 @@
 		.failed {
 			background: #f1a3a3;
 		}
-		.assign span {
+		.assign span.status {
 			display: inline-block;
 			width: 30px;
 			text-align: center;
@@ -37,7 +36,7 @@
 			font-size: 150%;
 			color: #666;
 		}
-		.assign span:hover {
+		.assign span.status:hover {
 			opacity: 0.7;
 		}
 		.smokeScreen {
@@ -175,6 +174,40 @@
 			alert(message);
 			window.close();
 		};
+
+		function setCheckboxes(racks) {
+			var checkbox = d3.select("#rack_checkboxes")
+				.selectAll(".checkbox")
+				.data(racks, d => d);
+			checkbox.exit()
+				.remove();
+
+			var spans = checkbox.enter()
+				.append("span")
+					.attr("class", "checkbox");
+			spans
+				.append("input")
+					.attr("type", "checkbox")
+					.property("checked", true)
+					.attr("id", d => d);
+			spans
+				.append("label")
+				.attr("for", d => d)
+				.text(d => d);				
+		};
+
+		function updateSamples(prop, to) {
+			var racks = d3.selectAll("span.checkbox")
+				.selectAll("input")
+				.filter(function() {return this.checked})
+				.nodes()
+				.map(el => el.id);
+			if(racks.length == 0){
+				alert("Please, select at least one rack.")
+			} else {
+				jrc.callFunction(prop, [to, racks]);
+			}
+		};
 	</script>
 </head>
 <body>
@@ -208,21 +241,23 @@
 			</table>
 			<div style="padding-top: 20px; font-size: 80%; font-style: italic;">
 				Made with <a href="anders-biostat.github.io/linked-charts">R/Linked-Charts</a> by S.Ovchinnikova and S.Anders, ZMBH
-			</div>
+			</div>						
 		</div>
 		<div class="assign" style="grid-column: 2; grid-row: 2">
-			<p>Hold "Shift" and select wells from the layout</p>
+			<p id="rack_checkboxes">
+				<span>apply changes to racks:</span><br>
+			</p>
 			<p>mark selected as: 
-				<span style="background: #d22d2d;" onclick="jrc.callFunction('assign', 'positive');" title="positive">p</span>
-				<span style="background: #f58e09;" onclick="jrc.callFunction('assign', 'inconclusive');" title="inconclusive">i</span>
-				<span style="background: #48b225;" onclick="jrc.callFunction('assign', 'negative');" title="negative">n</span>
-				<span style="background: #194689;" onclick="jrc.callFunction('assign', 'repeat');" title="repeat">r</span>
-				<span style="background: #270404;" onclick="jrc.callFunction('assign', 'failed');" title="failed">f</span>
+				<span class="status" style="background: #d22d2d;" onclick="updateSamples('assign', 'positive');" title="positive">p</span>
+				<span class="status" style="background: #f58e09;" onclick="updateSamples('assign', 'inconclusive');" title="inconclusive">i</span>
+				<span class="status" style="background: #48b225;" onclick="updateSamples('assign', 'negative');" title="negative">n</span>
+				<span class="status" style="background: #194689;" onclick="updateSamples('assign', 'repeat');" title="repeat">r</span>
+				<span class="status" style="background: #270404;" onclick="updateSamples('assign', 'failed');" title="failed">f</span>
 				<button onclick="jrc.callFunction('reset')">Reset plate</button> 
 			</p>
 			<p>
 				add comment: <input type="text" name="comment" id="comment">
-				<button onclick="jrc.callFunction('comment', document.getElementById('comment').value);">Add</button>
+				<button onclick="updateSamples('comment', document.getElementById('comment').value);">Add</button>
 			</p>
 			<button onclick="jrc.callFunction('export')">Export all plates to file</button>
 			<button onclick="askForCredentials();">Post this plate to the server</button>
