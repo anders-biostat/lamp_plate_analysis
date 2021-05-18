@@ -5,10 +5,20 @@ library( tidyverse )
 library( rlc )
 
 controls <- c("ACTB", "Actin", "Zika")
+results_order <- rev(1:5)
+names(results_order) <- c("positive", "inconclusive", "negative", "repeat", "fail")
 
 tecan_workbook <- commandArgs(TRUE)[1]
 if(!file.exists(tecan_workbook))
   stop(str_c("File not found: ", tecan_workbook))
+rack_to_plate = tibble(rack = "__empty__", plate = "__empty__")
+
+if(file.exists(rack_to_plate_path)) {
+  read_csv2(rack_to_plate_path) %>%
+    mutate_all(~str_remove(., "\\w$")) -> rack_to_plate
+  colnames(rack_to_plate) <- c("rack", "plate")
+}
+  
 
 read_tecan_sheet <- function( filename, sheet ) {
   inner_join( by="well",
@@ -25,20 +35,22 @@ read_excel( tecan_workbook, "PrimerSetsUsed" ) %>%
   {corners_all <<- .} %>%
   select(plate) %>%
   distinct() %>%
-  mutate(filename = str_c(plate, "_barcodes.xlsx"), 
-         dirname = file.path(dirname(dirname(tecan_workbook)), plate)) %>%
+  full_join(rack_to_plate) %>%
+  filter(plate != "__empty__") %>%
+  mutate(rack = ifelse(is.na(rack), plate, rack)) %>%
+  mutate(filename = str_c(rack, "_barcodes.xlsx"), 
+         dirname = file.path(dirname(dirname(tecan_workbook)), rack)) %>%
   mutate(fullpath = file.path(dirname, filename)) %>%
-  group_by(fullpath) %>%
+  group_by(plate, rack, fullpath) %>%
   summarise(barcodes = list(read_excel(fullpath, 
                                        range = cell_cols("A:E"))),
             .groups = "drop") %>%
   unnest(barcodes) %>%
   rename( "well96" = "Tube Position", 
-          "plate" = "Rack ID", 
           "content" = "Type",
           "tubeId" = "Tube ID",
           "comment" = "Comment") %>%
-  select(-fullpath) %>%
+  select(-fullpath, -`Rack ID`) %>%
   mutate(comment = ifelse(is.na(comment), "", comment)) %>%
   mutate_at( "well96", str_replace, "0(\\d+)", "\\1" ) -> contents_all
 
@@ -289,8 +301,16 @@ getTitle <- function(cnr) {
                       '", corners["', cnr, '", "plate"], corners["', cnr, '", "PrimerSet"] )'))
 }
 
+getLayout <- function(contents) {
+  contents %>%
+    group_by(plate, col96, row96Letter) %>%
+    summarise(same_result = length(unique(assigned)) == 1,
+              assigned = assigned[which.max(results_order[assigned])])
+}
+
 plates <- unique(corners_all$plate)
-contents <- filter(contents_all, plate == plates[1])
+contents <- filter(contents_all, plate == plate[1])
+layout <- getLayout(contents)
 tblWide <- filter(tblWide_all, plate == plates[1])
 corners <- filter(corners_all, plate == plates[1]) %>%
   column_to_rownames("corner")
@@ -311,7 +331,7 @@ allCharts <- c("A1", "A2", "B1", "B2", "assigned", "content")
 
 # let's check that each well-plate combination is unique
 contents_all %>%
-  group_by(well96, plate) %>%
+  group_by(well96, rack) %>%
   tally() %>%
   filter(n > 1) -> dupls
 
@@ -356,8 +376,8 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
 }
 
 lc_scatter(dat(opacity = getOpacity(highlighted), 
-               x = contents$col96, y = contents$row96Letter,
-               colourValue = contents$content,
+               x = layout$col96, y = layout$row96Letter,
+               colourValue = layout$content,
                title = str_c("Plate ", corners$plate[1])),
   domainY = LETTERS[8:1],
   titleSize = 20,
@@ -392,8 +412,8 @@ lc_scatter(dat(opacity = getOpacity(highlighted),
   place = "plates", chartId = "content")
 
 lc_scatter(dat(opacity = getOpacity(highlighted), 
-               x = contents$col96, y = contents$row96Letter, 
-               colourValue = contents$assigned),
+               x = layout$col96, y = layout$row96Letter, 
+               colourValue = layout$assigned),
            domainY = LETTERS[8:1],
            palette = palette$assigned$colour,
            colourDomain = palette$assigned$type,
