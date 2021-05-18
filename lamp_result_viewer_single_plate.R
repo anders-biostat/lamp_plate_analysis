@@ -217,7 +217,7 @@ export <- function() {
                                   result == "repeat" ~ "LAMPREPEAT",
                                   result == "failed" ~ "LAMPFAILED",
                                   result == "inconclusive" ~ "LAMPINC")) %>%
-    select(plate, well96, tubeId, result, LAMPStatus, comment) %>%
+    select(plate, rack, well96, tubeId, result, LAMPStatus, comment) %>%
     write_csv(file.path(dirname(tecan_workbook), file_name))
   
   messages[plates] <- str_c("Last exported at ", format(Sys.time(), "%H:%M:%S"))
@@ -294,14 +294,19 @@ post <- function(username, password) {
       messages <<- messages
       updateMessage(messages[contents$plate[1]])
       
-      file_name <- str_c(format(Sys.time(), "%y%m%d_%H%M%S_postLog_"), contents$plate[1], "_",
-                         str_replace(basename(tecan_workbook), "\\.\\w+$", ".csv"))
+      racks <- unique(contents$rack)
       
-      res %>%
-        as_tibble() %>%
-        rename(response_status = status) %>%
-        left_join(rename(posted, new_status = status)) %>%
-        write_csv(file.path(dirname(dirname(tecan_workbook)), contents$plate[1], file_name))
+      for(r in racks) {
+        file_name <- str_c(format(Sys.time(), "%y%m%d_%H%M%S_postLog_"), r, "_",
+                           str_replace(basename(tecan_workbook), "\\.\\w+$", ".csv"))
+        
+        res %>%
+          as_tibble() %>%
+          rename(response_status = status) %>%
+          left_join(rename(posted, new_status = status)) %>%
+          filter(rack == r) %>%          
+          write_csv(file.path(dirname(dirname(tecan_workbook)), r, file_name))
+      }
     }
 }
 
