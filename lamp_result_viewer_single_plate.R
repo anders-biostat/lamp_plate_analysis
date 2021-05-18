@@ -227,8 +227,8 @@ updateMessage <- function(message) {
 }
 
 saveAssignment <- function() {
-  contents_all <<- left_join(contents_all, select(contents, assigned, comment, plate, well96), 
-                             by = c("plate", "well96"), suffix = c("", "_new")) %>%
+  contents_all <<- left_join(contents_all, select(contents, assigned, comment, plate, rack, well96), 
+                             by = c("plate", "rack", "well96"), suffix = c("", "_new")) %>%
     mutate(comment = if_else(is.na(comment_new), comment, comment_new),
            assigned = if_else(is.na(assigned_new), assigned, assigned_new)) %>%
     select(-assigned_new, -comment_new)
@@ -239,6 +239,7 @@ switchPlate <- function(pl) {
   if(pl %in% plates) {
     saveAssignment()
     contents <<- filter(contents_all, plate == pl)
+    layout <<- getLayout(contents)
     tblWide <<- filter(tblWide_all, plate == pl)
     corners <<- filter(corners_all, plate == pl) %>%
       column_to_rownames("corner")
