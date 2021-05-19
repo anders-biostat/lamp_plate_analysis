@@ -24,15 +24,26 @@ if(file.exists(rack_to_plate_path)) {
   colnames(rack_to_plate) <- c("rack", "plate")
 }
   
-
-read_tecan_sheet <- function( filename, sheet ) {
-  inner_join( by="well",
-    read_excel( filename, sheet, skip=24, n_max=384 ) %>%
-      assertr::verify( identical( colnames(.), c( "<>", "Value" ) ) ) %>%
-      rename( "well" = "<>", "od434" = "Value" ),
-    read_excel( filename, sheet, skip=425, n_max=384 ) %>%
-      assertr::verify( identical( colnames(.), c( "<>", "Value" ) ) ) %>%
-      rename( "well" = "<>", "od560" = "Value" ) )
+read_tecan_sheet <- function( filename, sheet, tecan_mode ) {
+  if(str_detect(tecan_mode, "Absorbance")) {
+    return (inner_join( by="well",
+        read_excel( filename, sheet, skip=24, n_max=384 ) %>%
+          assertr::verify( identical( colnames(.), c( "<>", "Value" ) ) ) %>%
+          rename( "well" = "<>", "od434" = "Value" ),
+        read_excel( filename, sheet, skip=425, n_max=384 ) %>%
+          assertr::verify( identical( colnames(.), c( "<>", "Value" ) ) ) %>%
+          rename( "well" = "<>", "od560" = "Value" ) ) %>%
+        mutate(value = od434 - od560) %>%
+        select(-od434, -od560))
+  } else if(str_detect(tecan_mode, "Fluorescence")) {
+    return(
+      read_excel( filename, sheet, skip=31, n_max=384 ) %>%
+        assertr::verify( colnames(.)[1] == "<>" ) %>%
+        `colnames<-`(c("well", "value" ))
+    )
+  } else {
+    stop(str_c("Unknown mode: ", tecan_mode))
+  }
 }
 
 read_excel( tecan_workbook, "PrimerSetsUsed" ) %>%
@@ -66,27 +77,28 @@ excel_sheets( tecan_workbook ) %>%
   { tibble( sheet = . ) } %>%
   filter(!(sheet %in% c("PrimerSetsUsed", "Barcodes_SampleTypes"))) %>%
   group_by_all() %>%
-  summarise(header = read_excel(tecan_workbook, sheet, "E14:E15", col_names = FALSE)[["...1"]]) %>%
+  summarise(header = read_excel(tecan_workbook, sheet, "E14:E18", col_names = FALSE)[["...1"]]) %T>%
+  {.$header[5] ->> tecan_mode} %>%
+  slice_head(n = 2) %>%
   mutate(type = c("plate", "minutes")) %>%
   pivot_wider(names_from = type, values_from = header) %>%
   mutate( minutes = str_match( minutes, "(\\d+)\\w*((min)?)" ) %>% `[`(,2) ) %>%
   group_by_all() %>%
-  summarise( a = list( read_tecan_sheet( tecan_workbook, sheet ) ), .groups = "drop" ) %>%
+  summarise( a = list( read_tecan_sheet( tecan_workbook, sheet, tecan_mode ) ), .groups = "drop" ) %>%
   unnest( a ) %>%
   mutate( row = ( str_sub( well, 1, 1 ) %>% map_int( utf8ToInt ) )- utf8ToInt("A") + 1  ) %>%
   mutate( col = as.integer( str_sub( well, 2, -1 ) ) ) %>%
   mutate( row96 = ceiling( row / 2 ) ) %>%
   mutate( col96 = ceiling( col / 2 ) ) %>%
   mutate( well96 = str_c( LETTERS[row96], col96 ) ) %>%
-  mutate( corner = str_c( LETTERS[ 1 + (row+1) %% 2 ], 1 + (col+1) %% 2 ) ) %>%
-  mutate(dOd = od434 - od560) %T>%
+  mutate( corner = str_c( LETTERS[ 1 + (row+1) %% 2 ], 1 + (col+1) %% 2 ) ) %T>%
   {contents_all <<- select(., well, well96, corner, row96, col96, plate) %>%
     distinct() %>%
     mutate(row96Letter = LETTERS[row96]) %>%
     pivot_wider(names_from = corner, values_from = well) %>%
     left_join(contents_all)} %>%
-  select(-od434, -od560, -row, -col, -row96, -col96, -well) %>%
-  pivot_wider(names_from = well96, values_from = dOd) -> tblWide_all
+  select(-row, -col, -row96, -col96, -well) %>%
+  pivot_wider(names_from = well96, values_from = value) -> tblWide_all
 
 tblWide_all %>%
   pivot_longer(names_to = "well96", values_to = "diff", -(sheet:corner)) %>%
@@ -501,7 +513,7 @@ ses$sendCommand(str_c("charts.assigned.legend.container(d3.select('#info').selec
 ses$sendCommand('d3.selectAll("#legend_res").selectAll("text").attr("font-size", 17).attr("dy", 7)')
 ses$sendCommand('d3.selectAll("#legend_sample").selectAll("text").attr("font-size", 17).attr("dy", 7)')
 fileName <- basename(tecan_workbook)
-ses$sendCommand(str_interp('d3.select("h3").html("File: <i>${fileName}</i>")'))
+ses$sendCommand(str_interp('d3.select("h3").html("File: <i>${fileName}</i> (${tecan_mode})")'))
 ses$sendCommand('d3.select("#plates").append("p").text("Hold the \'Shift\' key and select wells from one the layouts");')
 
 while(length(app$getSessionIds()) > 0)
