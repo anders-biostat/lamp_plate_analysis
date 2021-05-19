@@ -432,8 +432,7 @@ lc_scatter(dat(opacity = getOpacity(highlighted),
   height = 290,
   width = 550,
   paddings = list(top = 35, right = 10, left = 20, bottom = 20),
-  strokeWidth = 2,
-  stroke = "black",
+  strokeWidth = 0,
   on_mouseover = function(d) {
       highlighted <<- d
       updateCharts("highlighted")
@@ -454,12 +453,14 @@ lc_scatter(dat(opacity = getOpacity(highlighted),
   },
   showLegend = FALSE,
   transitionDuration = 0,
-  size = 10,
+  size = 11,
   place = "plates", chartId = "content")
 
 lc_scatter(dat(opacity = getOpacity(highlighted), 
                x = layout$col96, y = layout$row96Letter, 
-               colourValue = layout$assigned),
+               colourValue = layout$assigned,
+               strokeWidth = ifelse(layout$same_result, 0, 3)),
+           stroke = "black",
            domainY = LETTERS[8:1],
            palette = palette$assigned$colour,
            colourDomain = palette$assigned$type,
@@ -467,8 +468,6 @@ lc_scatter(dat(opacity = getOpacity(highlighted),
            width = 550,
            paddings = list(top = 10, right = 10, left = 20, bottom = 20),
            showPanel = FALSE,
-           strokeWidth = 2,
-           stroke = "black",
            on_mouseover = function(d) {
              highlighted <<- d
              updateCharts("highlighted")
@@ -489,7 +488,7 @@ lc_scatter(dat(opacity = getOpacity(highlighted),
            },
            showLegend = FALSE,
            transitionDuration = 0,
-           size = 10,
+           size = 11,
            place = "plates", chartId = "assigned")
 
 lc_html(dat(content = getContent(highlighted)), place = "highlighted")
