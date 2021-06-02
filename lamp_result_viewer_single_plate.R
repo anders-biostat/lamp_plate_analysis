@@ -63,7 +63,7 @@ read_excel( tecan_workbook, "PrimerSetsUsed" ) %>%
   {corners_all <<- .} %>%
   select(plate) %>%
   distinct() %>%
-  full_join(rack_to_plate) %>%
+  left_join(rack_to_plate) %>%
   filter(plate != "__empty__") %>%
   mutate(rack = ifelse(is.na(rack), plate, rack)) %>%
   mutate(filename = str_c(rack, "_barcodes.xlsx"), 
@@ -103,14 +103,34 @@ excel_sheets( tecan_workbook ) %>%
   mutate( row96 = ceiling( row / 2 ) ) %>%
   mutate( col96 = ceiling( col / 2 ) ) %>%
   mutate( well96 = str_c( LETTERS[row96], col96 ) ) %>%
-  mutate( corner = str_c( LETTERS[ 1 + (row+1) %% 2 ], 1 + (col+1) %% 2 ) ) %T>%
-  {contents_all <<- select(., well, well96, corner, row96, col96, plate) %>%
-    distinct() %>%
-    mutate(row96Letter = LETTERS[row96]) %>%
-    pivot_wider(names_from = corner, values_from = well) %>%
-    left_join(contents_all)} %>%
+  mutate( corner = str_c( LETTERS[ 1 + (row+1) %% 2 ], 1 + (col+1) %% 2 ) ) -> tecan_output
+
+if(str_detect(tecan_mode, "Fluorescence"))
+  tecan_output %>%
+    group_by(plate, well) %>%
+    mutate(value = value/value[minutes == 0]) %>%
+    ungroup() -> tecan_output
+
+tecan_output %>%
+  select(well, well96, corner, row96, col96, plate) %>%
+  distinct() %>%
+  mutate(row96Letter = LETTERS[row96]) %>%
+  pivot_wider(names_from = corner, values_from = well) %>%
+  left_join(contents_all) -> contents_all
+tecan_output %>%
   select(-row, -col, -row96, -col96, -well) %>%
   pivot_wider(names_from = well96, values_from = value) -> tblWide_all
+
+threshold <- 0
+base_threshold <- 0
+if(str_detect(tecan_mode, "Absorbance")) {
+  threshold <- 0.1
+  base_threshold <- -0.1
+} 
+if(str_detect(tecan_mode, "Fluorescence")){
+  threshold <- 1.3
+  base_threshold <- Inf #basically, there is no check for baseline
+}
 
 tblWide_all %>%
   pivot_longer(names_to = "well96", values_to = "diff", -(sheet:corner)) %>%
@@ -120,13 +140,13 @@ tblWide_all %>%
   group_by(plate, corner, well96, isControl) %>%
   summarise(baseline = mean(diff[minutes <= 10]),
             maxDiff = max(diff), .groups = "drop") %>%
-  mutate(result = ifelse(maxDiff >= 0.1, "positive", "negative")) %>%
+  mutate(result = ifelse(maxDiff >= threshold, "positive", "negative")) %>%
   group_by(well96, plate) %>% 
   summarise(positiveTest = sum(result == "positive" & !isControl),
             positiveControl = sum(result == "positive" & isControl),
             totalTest = sum(!isControl),
             totalControl = sum(isControl),
-            lowBaseline = sum(baseline <= -0.1),
+            lowBaseline = sum(baseline <= base_threshold),
             .groups = "drop") %>%
   mutate(result = case_when(
     lowBaseline < totalTest + totalControl ~ "repeat",
