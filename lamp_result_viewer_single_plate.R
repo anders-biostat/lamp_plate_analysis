@@ -174,7 +174,9 @@ getContent <- function(highlighted) {
   
   filter(contents, well96  == layout$well96[highlighted]) %>%
     mutate(rack = str_c("<b>", rack, "</b>")) -> highlighted_data
-  select(highlighted_data, rack, tubeId, assigned, comment) %>%
+  highlighted_data %>%  
+    mutate(assigned = ifelse(content == "empty", "", assigned)) %>%
+    select(rack, tubeId, assigned, comment) %>%
     unlist() %>%
     matrix(nrow = 4, byrow = TRUE) %>%
     hwrite(border = 0, width = "100%", 
@@ -183,7 +185,7 @@ getContent <- function(highlighted) {
   str_c(c(highlighted_data$well96[1], " -> ", highlighted_data[1, c("A1", "A2", "B1", "B2")] %>% 
                            unlist %>% 
                            str_c(collapse = ", "), ";<br>",
-                         "<center>", highlighted_data$content[1], "</center>",
+                         "<center>", layout$content[highlighted], "</center>",
                          table), collapse = "")
 }
 
@@ -351,8 +353,9 @@ getLayout <- function(contents) {
   contents %>%
     group_by(well96, col96, row96Letter) %>%
     summarise(same_result = length(unique(assigned)) == 1,
+              same_content = length(unique(content)) == 1,
               assigned = assigned[which.max(results_order[assigned])],
-              content = content[1])
+              content = c(content[content != "empty"], "empty")[1])
 }
 
 plates <- unique(corners_all$plate)
@@ -401,6 +404,7 @@ if(nrow(spurious) > 0) {
 # let's also check that content of the pooled wells is the same
 # TO DO: Ask if one can theoretically pool empty well and sample
 contents_all %>%
+  filter(content != "empty") %>%
   group_by(plate, well96) %>%
   summarise(n = length(unique(content))) %>%
   filter(n > 1) -> spurious
@@ -448,7 +452,9 @@ for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
 lc_scatter(dat(opacity = getOpacity(highlighted), 
                x = layout$col96, y = layout$row96Letter,
                colourValue = layout$content,
-               title = str_c("Plate ", corners$plate[1])),
+               title = str_c("Plate ", corners$plate[1]),
+               strokeWidth = ifelse(layout$same_content, 0, 3)),
+  stroke = "black",
   domainY = LETTERS[8:1],
   titleSize = 20,
   palette = palette$content$colour,
@@ -456,7 +462,6 @@ lc_scatter(dat(opacity = getOpacity(highlighted),
   height = 290,
   width = 550,
   paddings = list(top = 35, right = 10, left = 20, bottom = 20),
-  strokeWidth = 0,
   on_mouseover = function(d) {
       highlighted <<- d
       updateCharts("highlighted")
