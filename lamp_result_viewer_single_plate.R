@@ -135,8 +135,9 @@ tblWide_all %>%
     positiveTest == 0 ~ "negative",
     TRUE ~ "inconclusive")) %>%
   select(-(positiveTest:lowBaseline)) %>%
-  mutate(assigned = result) %>%
-  right_join(contents_all) -> contents_all
+  right_join(contents_all) %>%
+  mutate(result = ifelse(comment == "", result, "repeat"), 
+         assigned = result) -> contents_all
 
 colourBy <- "content"
 highlighted <- -1
