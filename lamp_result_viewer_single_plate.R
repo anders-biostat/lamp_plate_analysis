@@ -1,4 +1,4 @@
-library(hwriter)
+library( hwriter )
 library( readxl )
 library( later )
 library( httr )
@@ -12,9 +12,21 @@ names(results_order) <- c("positive", "inconclusive", "negative", "repeat", "fai
 tecan_workbook <- commandArgs(TRUE)[1]
 if(!file.exists(tecan_workbook))
   stop(str_c("File not found: ", tecan_workbook))
-rack_to_plate_path <- file.path(dirname(tecan_workbook), 
-                                "Files from Hamilton",
-                                "1500InputOutputMapping.csv")
+
+rack_to_plate_path <- ""
+ham_files <- list.files(file.path(dirname(tecan_workbook), "Files from Hamilton"))
+mapping_check <- str_detect(ham_files, "InputOutputMapping.csv")
+
+
+if(sum(mapping_check) > 1)
+  stop(str_c(file.path(dirname(tecan_workbook), "Files from Hamilton"),
+             " contains several mapping files: ", 
+             str_c(ham_files[mapping_check], collapse =  ", ")))
+
+if(sum(mapping_check) > 0)
+  rack_to_plate_path <- file.path(dirname(tecan_workbook), 
+                                 "Files from Hamilton",
+                                  ham_files[mapping_check])
 
 rack_to_plate = tibble(rack = "__empty__", plate = "__empty__")
 
