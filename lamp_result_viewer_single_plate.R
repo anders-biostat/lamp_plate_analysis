@@ -131,6 +131,7 @@ tblWide_all %>%
   mutate(result = case_when(
     lowBaseline < totalTest + totalControl ~ "repeat",
     positiveTest == totalTest ~ "positive",
+    positiveTest > 0 ~ "inconclusive",
     positiveControl < totalControl ~ "repeat",
     positiveTest == 0 ~ "negative",
     TRUE ~ "inconclusive")) %>%
