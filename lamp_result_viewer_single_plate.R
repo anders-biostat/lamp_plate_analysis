@@ -164,17 +164,21 @@ getOpacity <- function(highlighted) {
   op
 }
 getContent <- function(highlighted) {
-  if(highlighted == -1) {
+  marked <- getMarked("assigned")
+  if(highlighted %in% marked) marked <- highlighted
+  if(length(marked) > 1) marked <- marked[1]
+  if(length(marked) == 0) marked <- highlighted
+  if(marked == -1) {
     ses$sendCommand("d3.select('#highlighted').classed('failed', false);")
     return("No highlighted samples")
   }
-  if(layout$assigned[highlighted] == "failed") {
+  if(layout$assigned[marked] == "failed") {
     ses$sendCommand("d3.select('#highlighted').classed('failed', true);")
   } else {
     ses$sendCommand("d3.select('#highlighted').classed('failed', false);")
   }
   
-  filter(contents, well96  == layout$well96[highlighted]) %>%
+  filter(contents, well96  == layout$well96[marked]) %>%
     mutate(rack = str_c("<b>", rack, "</b>")) -> highlighted_data
   highlighted_data %>%  
     mutate(assigned = ifelse(content == "empty", "", assigned)) %>%
@@ -187,7 +191,7 @@ getContent <- function(highlighted) {
   str_c(c(highlighted_data$well96[1], " -> ", highlighted_data[1, c("A1", "A2", "B1", "B2")] %>% 
                            unlist %>% 
                            str_c(collapse = ", "), ";<br>",
-                         "<center>", layout$content[highlighted], "</center>",
+                         "<center>", layout$content[marked], "</center>",
                          table), collapse = "")
 }
 
