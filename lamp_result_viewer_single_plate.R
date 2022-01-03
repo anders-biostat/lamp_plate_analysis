@@ -139,7 +139,7 @@ tblWide_all %>%
   filter((minutes <= 25 & !isControl) | (minutes <= 20 & isControl))  %>%
   group_by(plate, corner, well96, isControl) %>%
   summarise(baseline = mean(diff[minutes <= 10]),
-            maxDiff = max(diff), .groups = "drop") %>%
+            maxDiff = max(diff[minutes >= 5]), .groups = "drop") %>%
   mutate(result = ifelse(maxDiff >= threshold, "positive", "negative")) %>%
   group_by(well96, plate) %>% 
   summarise(positiveTest = sum(result == "positive" & !isControl),
