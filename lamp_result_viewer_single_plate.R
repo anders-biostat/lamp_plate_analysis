@@ -108,7 +108,7 @@ excel_sheets( tecan_workbook ) %>%
 if(str_detect(tecan_mode, "Fluorescence"))
   tecan_output %>%
     group_by(plate, well) %>%
-    mutate(value = value/value[minutes == 0]) %>%
+    mutate(value = value/value[minutes == 5]) %>%
     ungroup() -> tecan_output
 
 tecan_output %>%
@@ -124,11 +124,11 @@ tecan_output %>%
 threshold <- 0
 base_threshold <- 0
 if(str_detect(tecan_mode, "Absorbance")) {
-  threshold <- 0.1
+  threshold <- -0.3
   base_threshold <- -0.1
 } 
 if(str_detect(tecan_mode, "Fluorescence")){
-  threshold <- 1.3
+  threshold <- 1.2
   base_threshold <- Inf #basically, there is no check for baseline
 }
 
@@ -163,10 +163,10 @@ tblWide_all %>%
 colourBy <- "content"
 highlighted <- -1
 
-palette <- list(content = data.frame(colour = c("#79dd79", "#1cb01c", "#0e580e",
-                                                "#c67c3b", "#4979e3", "#aeafb0"),
-                                    type = c("positive control CT32", "positive control CT29", "positive control CT26", 
-                                             "sample", "negative control", "empty"),
+palette <- list(content = data.frame(colour = c("#79dd79", "#0e580e",
+                                                "#c67c3b", "#aeafb0"),
+                                    type = c("positive control CT31", "positive control CT28", 
+                                             "sample", "empty"),
                                     stringsAsFactors = FALSE),
                 assigned = data.frame(colour = c("#48b225", "#f58e09", "#d22d2d", "#194689", "#270404"),
                                     type = c("negative", "inconclusive", "positive", "repeat", "failed"),
@@ -445,8 +445,10 @@ if(nrow(spurious) > 0) {
 for( cnr in c( "A1", "A2", "B1", "B2" ) ) {
   lc_vLine(v = ifelse(corners[cnr, "PrimerSet"] %in% controls, 20, 25), 
            dasharray = 5, transitionDuration = 0, colour = "#777", place = cnr)
-  lc_hLine(h = 0.1, dasharray = 5, transitionDuration = 0, colour = "#777", chartId = cnr, addLayer = TRUE)
-  
+  lc_hLine(h = -0.3, dasharray = 5, transitionDuration = 0, colour = "#777", chartId = cnr, addLayer = TRUE)
+  lc_hLine(h = 0.1, dasharray = 2, transitionDuration = 0, colour = "#777", chartId = cnr, addLayer = TRUE)
+  lc_hLine(h = 1.2, dasharray = 5, transitionDuration = 0, colour = "#777", chartId = cnr, addLayer = TRUE)
+    
   lc_line(
     dat(opacity = getOpacity(highlighted),
         lineWidth = ifelse(1:nrow(layout) == highlighted, 3, 1),
