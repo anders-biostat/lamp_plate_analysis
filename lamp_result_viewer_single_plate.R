@@ -94,7 +94,7 @@ excel_sheets( tecan_workbook ) %>%
   slice_head(n = 2) %>%
   mutate(type = c("plate", "minutes")) %>%
   pivot_wider(names_from = type, values_from = header) %>%
-  mutate( minutes = str_match( minutes, "(\\d+)\\w*((min)?)" ) %>% `[`(,2) ) %>%
+  mutate( minutes = as.numeric(str_match( minutes, "(\\d+)\\w*((min)?)" ) %>% `[`(,2) )) %>%
   group_by_all() %>%
   summarise( a = list( read_tecan_sheet( tecan_workbook, sheet, tecan_mode ) ), .groups = "drop" ) %>%
   unnest( a ) %>%
@@ -137,9 +137,9 @@ tblWide_all %>%
   left_join(corners_all) %>%
   mutate(isControl = PrimerSet %in% controls) %>%
   filter((minutes <= 25 & !isControl) | (minutes <= 20 & isControl))  %>%
-  group_by(plate, corner, well96, isControl) %>%
+  group_by(plate, corner, well96, isControl) %>% 
   summarise(baseline = mean(diff[minutes <= 10]),
-            maxDiff = max(diff[minutes >= 5]), .groups = "drop") %>%
+            maxDiff = max(diff[minutes >= 5]), .groups = "drop") %>% 
   mutate(result = ifelse(maxDiff >= threshold, "positive", "negative")) %>%
   group_by(well96, plate) %>% 
   summarise(positiveTest = sum(result == "positive" & !isControl),
