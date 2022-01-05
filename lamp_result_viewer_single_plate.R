@@ -122,13 +122,16 @@ tecan_output %>%
   pivot_wider(names_from = well96, values_from = value) -> tblWide_all
 
 threshold <- 0
+ctrl_threshold <- 0
 base_threshold <- 0
 if(str_detect(tecan_mode, "Absorbance")) {
   threshold <- -0.3
+  ctrl_threshold <- -0.3
   base_threshold <- -0.1
 } 
 if(str_detect(tecan_mode, "Fluorescence")){
   threshold <- 1.2
+  ctrl_threshold <- 1.4
   base_threshold <- Inf #basically, there is no check for baseline
 }
 
@@ -136,18 +139,34 @@ tblWide_all %>%
   pivot_longer(names_to = "well96", values_to = "diff", -(sheet:corner)) %>%
   left_join(corners_all) %>%
   mutate(isControl = PrimerSet %in% controls) %>%
-  filter((minutes <= 25 & !isControl) | (minutes <= 20 & isControl))  %>%
+  # only values up to 15 minutes (for control) and up to 25 minutes (for other primers) will be used for comparison
+  filter((minutes <= 25 & !isControl) | (minutes <= 15 & isControl))  %>%
   group_by(plate, corner, well96, isControl) %>% 
+  # for each plate well, define a baseline (average from 0 to 10 minutes) and
+  # a maximum value (from 5 minutes)
   summarise(baseline = mean(diff[minutes <= 10]),
             maxDiff = max(diff[minutes >= 5]), .groups = "drop") %>% 
-  mutate(result = ifelse(maxDiff >= threshold, "positive", "negative")) %>%
+  # maximum value is compared to the threshold. Separately for controls and other primers
+  # ("maxDiff" since the times when the was only absorbance and therefore differences between absorbance on the two wave lengths)
+  mutate(result = case_when(isControl & maxDiff >= ctrl_threshold ~ "positive", 
+                            !isControl & maxDiff >= threshold ~ "positive",
+                            TRUE ~ "negative")) %>%
   group_by(well96, plate) %>% 
+  #for each sample, number of positive results, positive controls, total tests, total controls and tests with low baseline
+  #is calculated
   summarise(positiveTest = sum(result == "positive" & !isControl),
             positiveControl = sum(result == "positive" & isControl),
             totalTest = sum(!isControl),
             totalControl = sum(isControl),
             lowBaseline = sum(baseline <= base_threshold),
             .groups = "drop") %>%
+  #based on the values, calculated above a classification is performed in the following order
+  # at least one test with high baseline -> repeat
+  # all tests are positive -> positive
+  # at least one test is positive -> inconclusive
+  # not all controls are positive -> repeat
+  # all tests are negative -> negative
+  # something else -> inconclusive
   mutate(result = case_when(
     lowBaseline < totalTest + totalControl ~ "repeat",
     positiveTest == totalTest ~ "positive",
@@ -157,6 +176,7 @@ tblWide_all %>%
     TRUE ~ "inconclusive")) %>%
   select(-(positiveTest:lowBaseline)) %>%
   right_join(contents_all) %>%
+  #if there is any comment to the sample, classification is changed to "repeat"
   mutate(result = ifelse(comment == "", result, "repeat"), 
          assigned = result) -> contents_all
 
