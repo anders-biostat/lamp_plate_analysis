@@ -6,11 +6,11 @@ library( tidyverse )
 library( rlc )
 
 controls <- c("ACTB", "Actin", "Zika")
-results_order <- rev(1:5)
-names(results_order) <- c("positive", "inconclusive", "negative", "repeat", "failed")
+results_order <- rev(1:7)
+names(results_order) <- c("3 positives", "2 positives", "1 positive", "inconclusive", "negative", "repeat", "failed")
 
-tecan_workbook <- commandArgs(TRUE)[1]
-#tecan_workbook <- "D:\\Heibox\\Seafile\\VT-plates B-FAST\\VT-0440\\VT-0440_LAMP.xlsx"
+#tecan_workbook <- commandArgs(TRUE)[1]
+tecan_workbook <- "/home/tyranchick/Git/lamp_plate_analysis/data/test/VT-0042/VT-0042_43LAMP.xlsx"
 if(!file.exists(tecan_workbook))
   stop(str_c("File not found: ", tecan_workbook))
 
@@ -171,9 +171,10 @@ tblWide_all %>%
   # something else -> inconclusive
   mutate(result = case_when(
     lowBaseline < totalTest + totalControl ~ "repeat",
-    positiveTest == totalTest ~ "positive",
-    positiveTest > 0 ~ "inconclusive",
-    positiveControl < totalControl ~ "repeat",
+    positiveControl + positiveTest == 0 ~ "repeat",
+    positiveControl < totalControl ~ "inconclusive",
+    positiveTest == 1 ~ "1 positive",
+    positiveTest > 1 ~ str_c(positiveTest, " positives"),
     positiveTest == 0 ~ "negative",
     TRUE ~ "inconclusive")) %>%
   select(-(positiveTest:lowBaseline)) %>%
@@ -190,8 +191,8 @@ palette <- list(content = data.frame(colour = c("#79dd79", "#0e580e",
                                     type = c("positive control CT31", "positive control CT28", 
                                              "sample", "empty"),
                                     stringsAsFactors = FALSE),
-                assigned = data.frame(colour = c("#48b225", "#f58e09", "#d22d2d", "#194689", "#270404"),
-                                    type = c("negative", "inconclusive", "positive", "repeat", "failed"),
+                assigned = data.frame(colour = c("#48b225", "#f58e09", "#ff0000", "#ff6666", "#ff99aa", "#194689", "#270404"),
+                                    type = c("negative", "inconclusive", "3 positives", "2 positives", "1 positive", "repeat", "failed"),
                                     stringsAsFactors = FALSE))
 
 getOpacity <- function(highlighted) {
@@ -283,7 +284,9 @@ export <- function() {
     filter(content == "sample") %>%
     select(-result) %>%
     rename(result = assigned) %>%
-    mutate(LAMPStatus = case_when(result == "positive" ~ "LAMPPOS",
+    mutate(LAMPStatus = case_when(result == "1 positive" ~ "LAMPPOS1",
+                                  result == "2 positives" ~ "LAMPPOS2",
+                                  result == "3 positives" ~ "LAMPPOS3",
                                   result == "negative" ~ "LAMPNEG",
                                   result == "repeat" ~ "LAMPREPEAT",
                                   result == "failed" ~ "LAMPFAILED",
@@ -331,7 +334,9 @@ post <- function(username, password) {
   contents %>%
     ungroup() %>%
     filter(content == "sample") %>%
-    mutate(LAMPStatus = case_when(assigned == "positive" ~ "LAMPPOS",
+    mutate(LAMPStatus = case_when(assigned == "1 positive" ~ "LAMPPOS1",
+                                  assigned == "2 positives" ~ "LAMPPOS2",
+                                  assigned == "3 positives" ~ "LAMPPOS3",
                                   assigned == "negative" ~ "LAMPNEG",
                                   assigned == "repeat" ~ "LAMPREPEAT",
                                   assigned == "failed" ~ "LAMPFAILED",
@@ -417,7 +422,7 @@ messages <- setNames(rep("", length(plates)), plates)
 last <- function() {}
 loop <- create_loop()
 
-app <- openPage( FALSE, startPage = "plateBrowser_sp.html", 
+app <- openPage( FALSE, startPage = "plateBrowser.html", 
                  allowedFunctions = c("assign", "comment", "export", "reset", "switchPlate",
                                       "post"))
 ses <- app$getSession()
@@ -576,7 +581,7 @@ lc_html(dat(content = getContent(highlighted)), place = "highlighted")
 ses$callFunction("setCheckboxes", list(unique(contents$rack)), keepAsVector = TRUE)
 ses$sendCommand(str_c("charts.A1.legend.container(d3.select('#info').select('#legend_sample')).legend.sampleHeight(25).legend.width(250);",
                       "charts.A1.showLegend(true).update();"))
-ses$sendCommand(str_c("charts.assigned.legend.container(d3.select('#info').select('#legend_res')).legend.sampleHeight(30);",
+ses$sendCommand(str_c("charts.assigned.legend.container(d3.select('#info').select('#legend_res')).legend.sampleHeight(20).legend.width(150);",
                       "charts.assigned.showLegend(true).update();"))
 ses$sendCommand('d3.selectAll("#legend_res").selectAll("text").attr("font-size", 17).attr("dy", 7)')
 ses$sendCommand('d3.selectAll("#legend_sample").selectAll("text").attr("font-size", 17).attr("dy", 7)')
