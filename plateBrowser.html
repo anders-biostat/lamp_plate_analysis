@@ -18,7 +18,7 @@
 		#info #highlighted {
 			font-size: 14pt;
 			border: 1px solid black;
-			padding: 15px 20px 15px 20px;
+			padding: 10px 20px 10px 20px;
 			width: 340px;
 		}
 		#highlighted .linked-charts {
@@ -27,9 +27,194 @@
 		.failed {
 			background: #f1a3a3;
 		}
+		.assign span.status {
+			display: inline-block;
+			width: 30px;
+			text-align: center;
+			height: 30px;
+			font-weight: bold;
+			font-size: 150%;
+			color: #666;
+		}
+		.assign span.status:hover {
+			opacity: 0.7;
+		}
+		.smokeScreen {
+			position: fixed;
+			padding: 0;
+			margin: 0;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			background: #111;
+			opacity: 0.75;
+			z-index: 10;
+		}
+		.hidden {
+			display: none;
+		}
+		.message {
+			text-align: center;
+			color: #4a1f02;
+			letter-spacing: 1px;
+		}
+		.modal {
+			background: #ddd;
+			position: fixed;
+			top: 50%;
+			left: 50%;
+			width: 600px;
+			height: 300px;
+			margin-left: -300px;
+			margin-top: -150px;
+			z-index: 15;
+		}
+		#login, #report {
+			padding: 20px;
+			padding-top: 0px;
+			margin-left: 50px;
+		}
+
+		#errorLog {
+			width: 100%
+			padding: 10px;
+			margin-bottom: 10px;
+			height: 100px;
+			overflow-y: scroll;
+			border: solid 1px black;
+		}
 	</style>
+	<script type="text/javascript">
+		function addPlates(opts, plates) {
+			d3.select("#rackIds").selectAll("option")
+				.data(d3.range(opts.length).map(i => ({
+					text: opts[i],
+					plate: plates[i]
+				})))
+					.enter()
+					.append("option")
+						.attr("value", d => d.plate)
+						.text(d => d.text);
+
+			d3.select("#plateName").text(plates[0]);
+		};
+
+		function hideMessage() {
+			d3.select("#report")
+				.classed("hidden", true);
+			d3.select("#login")
+				.classed("hidden", false);
+			d3.select(".modal")
+				.classed("hidden", true);
+			d3.select(".smokeScreen")
+				.classed("hidden", true);
+		};
+
+		function askForCredentials() {
+			d3.select(".smokeScreen")
+				.classed("hidden", false);
+			d3.select(".modal")
+				.classed("hidden", false);
+		};
+
+		function wrongPassword() {
+			d3.select('#loginMessage').text('Incorrect user name or password.');
+		};
+
+		function reportSuccess(successNum, totalNum, log) {
+			d3.select('#loginMessage').text('Ready');
+
+			d3.select("#login")
+				.classed("hidden", true);
+			d3.select('#loginMessage').text('');
+
+			d3.select("#successNum")
+				.text(successNum);
+			d3.select("#totalNum")
+				.text(totalNum);
+			d3.select("#report")
+				.classed("hidden", false);
+
+			var errEntrs = d3.select("#errorLog").select("table")
+				.selectAll(".entry").data(log);
+			errEntrs.exit().remove();
+			errEntrs.enter()
+				.append("tr")
+					.attr("class", "entry")
+					.merge(errEntrs)
+						.html(d => '<td>' + d.barcode + '</td><td>' + d.status + '</td><td>' + d.message + '</td>')
+		};
+
+		function submitPassword() {
+			jrc.callFunction('post', [
+				document.getElementById('username').value, 
+				document.getElementById('psw').value
+			])
+
+			d3.select('#loginMessage').text('Please, wait...');
+		};
+
+		function alertContentProblem(type) {
+			if(!Array.isArray(spurious))
+				spurious = [spurious];
+			var message = "";
+
+			if(type == "duplicates"){
+				message = "Duplicated wells detected\n" + 
+					spurious.map(el => "rack: " + el.rack + ", well: " + el.well96)
+						.join("; ");
+			} else if(type == "mixed_content") {
+				message = "Pooled wells with mixed content detected\n" + 
+					spurious.map(el => "plate: " + el.plate + ", well: " + el.well96)
+						.join("; ");
+			} else {
+				message = "Unknown content problem: " + type;
+			}
+			alert(message);
+			window.close();
+		};
+
+		function setCheckboxes(racks) {
+			var checkbox = d3.select("#rack_checkboxes")
+				.selectAll(".checkbox")
+				.data(racks, d => d);
+			checkbox.exit()
+				.remove();
+
+			var spans = checkbox.enter()
+				.append("span")
+					.attr("class", "checkbox");
+			spans
+				.append("input")
+					.attr("type", "checkbox")
+					.property("checked", true)
+					.attr("id", d => d);
+			spans
+				.append("label")
+				.attr("for", d => d)
+				.text(d => d);				
+		};
+
+		function updateSamples(prop, to) {
+			var racks = d3.selectAll("span.checkbox")
+				.selectAll("input")
+				.filter(function() {return this.checked})
+				.nodes()
+				.map(el => el.id);
+			if(racks.length == 0){
+				alert("Please, select at least one rack.")
+			} else {
+				jrc.callFunction(prop, [to, racks]);
+			}
+		};
+	</script>
 </head>
 <body>
+	<div style="position: absolute;">
+		Select a plate to display:
+		<select id="rackIds" onchange="jrc.callFunction('switchPlate', this.value); d3.select('#plateName').text(this.value);" style="width: 300px;"></select>
+	</div>
 	<h2 style="text-align: center;">LAMP results viewer</h2>
 	<h3>Opened file:</h3>
 	<div style="display: grid;">
@@ -45,7 +230,7 @@
 				</tr>
 			</table>			
 		</div>
-		<div id="plates" style="grid-column: 2; grid-row: 1/3;"></div>
+		<div id="plates" style="grid-column: 2; grid-row: 1;"></div>
 		<div id="info" style="grid-column: 1; grid-row: 2; padding-left: 150px">
 			<table>
 				<tr>
@@ -54,7 +239,59 @@
 					<td id="legend_res"></td>
 				</tr>
 			</table>
+			<div style="padding-top: 20px; font-size: 80%; font-style: italic;">
+				Made with <a href="anders-biostat.github.io/linked-charts">R/Linked-Charts</a> by S.Ovchinnikova and S.Anders, ZMBH
+			</div>						
+		</div>
+		<div class="assign" style="grid-column: 2; grid-row: 2">
+			<p id="rack_checkboxes">
+				<span>apply changes to racks:</span><br>
+			</p>
+			<p>mark selected as: 
+				<span class="status" style="background: #d22d2d;" onclick="updateSamples('assign', 'positive');" title="positive">p</span>
+				<span class="status" style="background: #f58e09;" onclick="updateSamples('assign', 'inconclusive');" title="inconclusive">i</span>
+				<span class="status" style="background: #48b225;" onclick="updateSamples('assign', 'negative');" title="negative">n</span>
+				<span class="status" style="background: #194689;" onclick="updateSamples('assign', 'repeat');" title="repeat">r</span>
+				<span class="status" style="background: #270404;" onclick="updateSamples('assign', 'failed');" title="failed">f</span>
+				<button onclick="jrc.callFunction('reset')">Reset plate</button> 
+			</p>
+			<p>
+				add comment: <input type="text" name="comment" id="comment">
+				<button onclick="updateSamples('comment', document.getElementById('comment').value);">Add</button>
+			</p>
+			<button onclick="jrc.callFunction('export')">Export all plates to file</button>
+			<button onclick="askForCredentials();">Post this plate to the server</button>
+			<p class="message" id="plateMessage"></p>
 		</div>	
 	</div>
-	<div style="padding-top: 20px; font-size: 80%; font-style: italic;">Made with <a href="anders-biostat.github.io/linked-charts">R/Linked-Charts</a> by S.Ovchinnikova and S.Anders, ZMBH</div>
+	<div class="smokeScreen hidden" onclick="hideMessage();"></div>
+	<div class="modal hidden">
+		<h3>Post plate <span id="plateName"></span></h3>
+		<div id="login">
+			<p>Username: <input type="text" id="username"></p>
+			<p>Password: <input type="password" id="psw"></p>
+			<p>
+				<button onclick="hideMessage();">Close</button>
+				<button onclick="submitPassword();">Submit</button>
+			</p>
+			<p id="loginMessage" class="message"></p>
+		</div>
+		<div id="report" class="hidden">
+			<p>
+				New statuses for <span id="successNum" style="color: #247b0f; font-weight: bold;"></span> 
+				out of <span id="totalNum" style="font-weight: bold;"></span> samples uploaded.
+			</p>
+			<p>Error log (stored automatically):</p>
+			<div id="errorLog">
+				<table>
+					<tr>
+						<th>Barcode</th>
+						<th>Status</th>
+						<th>Server response</th>
+					</tr>
+				</table>
+			</div>
+			<button onclick="hideMessage()">Close</button>
+		</div>
+	</div>
 </body>
