@@ -9,8 +9,8 @@ controls <- c("ACTB", "Actin", "Zika")
 results_order <- rev(1:7)
 names(results_order) <- c("3 positives", "2 positives", "1 positive", "inconclusive", "negative", "repeat", "failed")
 
-#tecan_workbook <- commandArgs(TRUE)[1]
-tecan_workbook <- "/home/tyranchick/Git/lamp_plate_analysis/data/test/VT-0042/VT-0042_43LAMP.xlsx"
+tecan_workbook <- commandArgs(TRUE)[1]
+#tecan_workbook <- "/home/tyranchick/Git/lamp_plate_analysis/data/test/VT-0042/VT-0042_43LAMP.xlsx"
 if(!file.exists(tecan_workbook))
   stop(str_c("File not found: ", tecan_workbook))
 
