@@ -6,11 +6,21 @@ library( tidyverse )
 library( rlc )
 
 controls <- c("ACTB", "Actin", "Zika")
+palette <- list(content = data.frame(colour = c("#79dd79", "#0e580e", "#c67c3b", "#aeafb0", "#79dd79", "#1cb01c", "#0e580e", "#4979e3"),
+                                     type = c("positive control CT31", "positive control CT28", "sample", "empty", "positive control CT32",
+                                              "positive control CT29", "positive control CT26", "negative control"),
+                                     stringsAsFactors = FALSE),
+                assigned = data.frame(colour = c("#48b225", "#f58e09", "#ff0000", "#ff6666", "#ff99aa", "#194689", "#270404"),
+                                      type = c("negative", "inconclusive", "3 positives", "2 positives", "1 positive", "repeat", "failed"),
+                                      stringsAsFactors = FALSE))
+
 results_order <- rev(1:7)
 names(results_order) <- c("3 positives", "2 positives", "1 positive", "inconclusive", "negative", "repeat", "failed")
 
-tecan_workbook <- commandArgs(TRUE)[1]
-#tecan_workbook <- "/home/tyranchick/Git/lamp_plate_analysis/data/test/VT-0042/VT-0042_43LAMP.xlsx"
+
+#tecan_workbook <- commandArgs(TRUE)[1]
+tecan_workbook <- "data/test/VT-0016/VT-0016-0019_LAMP.xlsx"
+
 if(!file.exists(tecan_workbook))
   stop(str_c("File not found: ", tecan_workbook))
 
@@ -183,17 +193,10 @@ tblWide_all %>%
   mutate(result = ifelse(comment == "", result, "repeat"), 
          assigned = result) -> contents_all
 
+palette$content <- subset(palette$content, type %in% unique(contents_all$content))
+
 colourBy <- "content"
 highlighted <- -1
-
-palette <- list(content = data.frame(colour = c("#79dd79", "#0e580e",
-                                                "#c67c3b", "#aeafb0"),
-                                    type = c("positive control CT31", "positive control CT28", 
-                                             "sample", "empty"),
-                                    stringsAsFactors = FALSE),
-                assigned = data.frame(colour = c("#48b225", "#f58e09", "#ff0000", "#ff6666", "#ff99aa", "#194689", "#270404"),
-                                    type = c("negative", "inconclusive", "3 positives", "2 positives", "1 positive", "repeat", "failed"),
-                                    stringsAsFactors = FALSE))
 
 getOpacity <- function(highlighted) {
   if(highlighted == -1) {
